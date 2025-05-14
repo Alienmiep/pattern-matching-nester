@@ -1,6 +1,7 @@
 import os
 from svgpathtools import svg2paths, Path
 
+from export_svg import export_piece_to_svg
 from models.pattern import Pattern
 from models.piece import Piece
 
@@ -76,3 +77,5 @@ if __name__ == "__main__":
     full_pattern = Pattern(merged_pieces)
 
     print(full_pattern)
+    for piece in full_pattern.pieces:
+        export_piece_to_svg(piece, f"piece_{piece.index}.svg")
