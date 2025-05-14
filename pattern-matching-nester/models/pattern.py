@@ -3,4 +3,4 @@ class Pattern():
         self.pieces = pieces
 
     def __str__(self):
-        return ";\n".join([str(x) for x in self.pieces])
+        return ";\n".join([str(x) for x in self.pieces]) if self.pieces else ""

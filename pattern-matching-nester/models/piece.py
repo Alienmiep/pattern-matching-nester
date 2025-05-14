@@ -3,12 +3,13 @@ from svgpathtools import Path
 COORDINATE_DECIMAL_PLACES = 1
 
 class Piece():
-    def __init__(self, path: Path):
+    def __init__(self, index: int, path: Path):
+        self.index = index
         self.path = path
         self.vertices = self.__extract_vertices()
 
     def __str__(self):
-        return f"Vertices: {self.vertices}"
+        return f"Index: {self.index}, Vertices: {self.vertices}"
 
     def __extract_vertices(self) -> list:
         vertices = []
