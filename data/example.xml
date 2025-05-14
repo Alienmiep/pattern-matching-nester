@@ -1,0 +1,29 @@
+<svg>
+  <metadata>
+    <seams>
+      <seam>
+        <seampart part="sleeve-left"
+                  start="10,10"
+                  end="100,10"
+                  direction="?"/>
+        <seampart part="bodive-left"
+                  start="10,10"
+                  end="100,10"/>
+      <seam/>
+      <seam>
+        <seampart part="sleeve-right"
+                  start="10,10"
+                  end="100,10"/>
+        <seampart part="bodive-right"
+                  start="10,10"
+                  end="100,10"/>
+      <seam/>
+    </seams>
+  </metadata>
+
+  <!-- Visual sewing pattern -->
+  <path d="M10,10 L100,10" stroke="black" fill="none"/>
+  <path d="M100,10 L100,80" stroke="black" fill="none"/>
+  <path d="M20,20 L150,20" stroke="black" fill="none"/>
+
+</svg>
