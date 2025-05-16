@@ -21,6 +21,39 @@ def __segments_equal(s1, s2, tol=1e-5) -> bool:
     )
 
 
+def __reorder_segments(segments: list, tol=1e-6) -> list:
+    """Reorder and orient segments so they form a continuous path."""
+    if not segments:
+        return []
+
+    ordered = [segments.pop(0)]
+    while segments:
+        previous_segment = ordered[-1]
+
+        match_index = None
+        reverse_needed = False
+        for i, seg in enumerate(segments):
+            if abs(seg.start - previous_segment.end) < tol:
+                match_index = i
+                reverse_needed = False
+                break
+            elif abs(seg.end - previous_segment.end) < tol:
+                match_index = i
+                reverse_needed = True
+                break
+
+        if match_index is not None:
+            match = segments.pop(match_index)
+            if reverse_needed:
+                match = match.reversed()
+            ordered.append(match)
+        else:
+            # No match found: path is not fully continuous
+            break
+
+    return ordered
+
+
 def combine_paths(path1: Path, path2: Path) -> Path:
     combined_segments = list(path1) + list(path2)
     cleaned_segments = []
@@ -38,7 +71,10 @@ def combine_paths(path1: Path, path2: Path) -> Path:
         else:
             cleaned_segments.append(seg)
 
-    return Path(*cleaned_segments)
+    # Reorder to restore continuity
+    reordered = __reorder_segments(cleaned_segments)
+
+    return Path(*reordered)
 
 
 def merge_pieces_with_common_vertices(pieces: list) -> list:
