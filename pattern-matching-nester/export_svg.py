@@ -1,8 +1,7 @@
 import svgwrite
-from models.piece import Piece
 
 
-def export_piece_to_svg(piece: Piece, filename: str):
+def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     """Export a Piece object directly to an SVG file using its existing Path."""
     dwg = svgwrite.Drawing(filename, profile='tiny')
 
@@ -15,6 +14,10 @@ def export_piece_to_svg(piece: Piece, filename: str):
     for i in range(len(piece.path) - 1):
         if not abs(piece.path[i].end - piece.path[i+1].start) < 1e-5:
             print(f"Gap between segment {i} and {i+1}")
+
+    if original_svg_attrs:
+        for k, v in original_svg_attrs.items():
+            dwg.attribs[k] = v
 
     dwg.add(dwg.path(d=svg_path_str, fill="none", stroke="black", stroke_width=0.2))
     dwg.save()

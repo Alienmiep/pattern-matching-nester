@@ -1,5 +1,6 @@
 import os
 from svgpathtools import svg2paths, Path
+import xml.etree.ElementTree as ET
 
 from export_svg import export_piece_to_svg
 from models.pattern import Pattern
@@ -64,9 +65,22 @@ def reindex(pieces: list) -> list:
     return pieces
 
 
+def get_svg_attributes(svg_file: str) -> dict:
+    tree = ET.parse(svg_file)
+    root = tree.getroot()
+
+    return {
+        key: root.attrib[key]
+        for key in root.attrib
+        if key in {'viewBox', 'width', 'height', 'baseProfile'} # , 'xmlns', 'xmlns:xlink', 'xmlns:ev', 'version', 'baseProfile'}
+    }
+
+
 if __name__ == "__main__":
     if not os.path.exists(SVG_FILE):
             raise FileNotFoundError(f"SVG file not found: {SVG_FILE}")
+
+    svg_attributes = get_svg_attributes(SVG_FILE)
 
     paths, attributes = svg2paths(SVG_FILE)
     pieces = []
@@ -78,4 +92,4 @@ if __name__ == "__main__":
 
     print(full_pattern)
     for piece in full_pattern.pieces:
-        export_piece_to_svg(piece, f"piece_{piece.index}.svg")
+        export_piece_to_svg(piece, f"piece_{piece.index}.svg", svg_attributes)
