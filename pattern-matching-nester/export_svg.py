@@ -8,12 +8,12 @@ def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     # Use svgpathtools to get the SVG path string
     svg_path_str = piece.path.d() + "Z"
 
-    for i, seg in enumerate(piece.path):
-        print(f"Segment {i}: start={seg.start}, end={seg.end}")
+    # for i, seg in enumerate(piece.path):
+    #     print(f"Segment {i}: start={seg.start}, end={seg.end}")
 
-    for i in range(len(piece.path) - 1):
-        if not abs(piece.path[i].end - piece.path[i+1].start) < 1e-5:
-            print(f"Gap between segment {i} and {i+1}")
+    # for i in range(len(piece.path) - 1):
+    #     if not abs(piece.path[i].end - piece.path[i+1].start) < 1e-5:
+    #         print(f"Gap between segment {i} and {i+1}")
 
     if original_svg_attrs:
         for k, v in original_svg_attrs.items():

@@ -7,7 +7,12 @@ from models.pattern import Pattern
 from models.piece import Piece
 
 SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
+MERGE_PIECES = True
+ALLOWED_CLASS_LISTS = []
 
+# SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
+# MERGE_PIECES = False
+# ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
 
 def __points_equal(p1: complex, p2: complex, tol: float = 1e-5) -> bool:
     return abs(p1.real - p2.real) < tol and abs(p1.imag - p2.imag) < tol
@@ -112,18 +117,28 @@ def get_svg_attributes(svg_file: str) -> dict:
     }
 
 
+def load_selected_paths(svg_file: str) -> list:
+    paths, attributes = svg2paths(svg_file)
+    selected_paths = []
+    for path, attr in zip(paths, attributes):
+        class_list = attr.get('class', '').split()
+        if not ALLOWED_CLASS_LISTS or class_list in ALLOWED_CLASS_LISTS:
+            selected_paths.append(path)
+    return selected_paths
+
+
 if __name__ == "__main__":
     if not os.path.exists(SVG_FILE):
             raise FileNotFoundError(f"SVG file not found: {SVG_FILE}")
 
     svg_attributes = get_svg_attributes(SVG_FILE)
 
-    paths, attributes = svg2paths(SVG_FILE)
+    paths = load_selected_paths(SVG_FILE)
     pieces = []
     for index, path in enumerate(paths):
         pieces.append(Piece(index, path))
 
-    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces))
+    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
     full_pattern = Pattern(merged_pieces)
 
     print(full_pattern)
