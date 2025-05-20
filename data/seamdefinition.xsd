@@ -1,0 +1,27 @@
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<xs:element name="seamdefinition">
+  <xs:complexType>
+    <xs:sequence>
+        <xs:element name="seam">
+          <xs:complexType>
+            <xs:sequence>
+                <xs:element name="seampart" maxOccurs="unbounded">
+                  <xs:complexType>
+                    <xs:sequence>
+                      <xs:element name="part" type="xs:string" minOccurs="0"/>
+                      <xs:element name="start" type="xs:string" minOccurs="1"/>
+                      <xs:element name="end" type="xs:string" minOccurs="1"/>
+                      <xs:element name="direction" type="xs:positiveInteger" minOccurs="0"/>
+                    </xs:sequence>
+                  </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:element>
+</xs:schema>

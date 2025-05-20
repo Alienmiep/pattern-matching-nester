@@ -10,6 +10,10 @@ SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
 MERGE_PIECES = True
 ALLOWED_CLASS_LISTS = []
 
+SVG_FILE = os.path.join(os.getcwd(), "data", "example.svg")
+MERGE_PIECES = True
+ALLOWED_CLASS_LISTS = []
+
 # SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
 # MERGE_PIECES = False
 # ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
