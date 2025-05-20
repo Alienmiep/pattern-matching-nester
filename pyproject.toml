@@ -10,6 +10,7 @@ package-mode = false
 python = "^3.10"
 svgpathtools = "^1.7.0"
 svgwrite = "^1.4.3"
+svg-path = "^6.3"
 
 
 [build-system]
