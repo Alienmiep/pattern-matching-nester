@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="4in" height="3in">
+    <metadata>
+    <seamdefinition xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="seamdefinition.xsd">
+  <seam>
+      <seampart>
+          <part>sleeve-left</part>
+          <start>10,1</start>
+          <end>100,1</end>
+          <direction>1</direction>
+      </seampart>
+      <seampart>
+          <part>bodice-left</part>
+          <start>10,1</start>
+          <end>100,1</end>
+          <direction>1</direction>
+      </seampart>
+    </seam>
+    <seam>
+      <seampart>
+          <part>sleeve-right</part>
+          <start>10,1</start>
+          <end>100,1</end>
+          <direction>1</direction>
+      </seampart>
+      <seampart>
+          <part>bodice-right</part>
+          <start>10,1</start>
+          <end>100,1</end>
+          <direction>1</direction>
+      </seampart>
+    </seam>
+</seamdefinition>
+
+    </metadata>
+
+  <!-- Visual sewing pattern -->
+  <path d="M10,10 L100,10 L100,30 Z" stroke="black" fill="none"/>
+
+</svg>
+
