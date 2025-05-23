@@ -1,10 +1,10 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsView, QGraphicsScene, QGraphicsPathItem, QPushButton,
-    QMainWindow, QFileDialog, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextEdit
+    QMainWindow, QFileDialog, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextEdit, QGraphicsItem, QGraphicsEllipseItem
 )
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPointF
 import xml.etree.ElementTree as ET
 from svg.path import parse_path
 from svg.path.path import Line, CubicBezier, QuadraticBezier, Arc, Move
@@ -59,7 +59,7 @@ class PathItem(QGraphicsPathItem):
         self.viewer = viewer
         self.setAcceptHoverEvents(True)
         self.setBrush(QColor(100, 200, 255, 80))
-        self.setPen(QPen(Qt.black, 1))
+        self.setPen(QPen(Qt.black, 0.5))
 
     def mousePressEvent(self, event):
         print("Clicked path with attributes:", self.attributes)
@@ -74,6 +74,29 @@ class PathItem(QGraphicsPathItem):
 
     def hoverLeaveEvent(self, event):
         self.setBrush(QColor(100, 200, 255, 80))
+
+    def get_points(self):
+        """Extract individual vertex positions from the QPainterPath."""
+        path = self.path()
+        points = []
+        for i in range(path.elementCount()):
+            el = path.elementAt(i)
+            points.append(QPointF(el.x, el.y))
+        return points
+
+class VertexItem(QGraphicsEllipseItem):
+    def __init__(self, point: QPointF, radius=1, parent=None):
+        super().__init__(-radius, -radius, 2 * radius, 2 * radius)
+        self.setPos(point)
+        self.setBrush(QColor(255, 100, 100))
+        self.setPen(QPen(Qt.black, 0.5))
+        self.setZValue(1)  # Appear on top
+        self.setFlags(QGraphicsItem.ItemIsSelectable)
+        self.setToolTip(f"({point.x():.1f}, {point.y():.1f})")
+
+    def mousePressEvent(self, event):
+        print(f"Clicked vertex at: ({self.pos().x():.1f}, {self.pos().y():.1f})")
+        super().mousePressEvent(event)
 
 
 class ZoomableGraphicsView(QGraphicsView):
@@ -158,6 +181,10 @@ class SvgPathViewer(QMainWindow):
                 painter_path = svg_path_to_qpainterpath(d_attr)
                 item = PathItem(painter_path, path_elem.attrib, path_elem, viewer=self)
                 self.scene.addItem(item)
+                # Add vertex dots
+                for pt in item.get_points():
+                    dot = VertexItem(pt)
+                    self.scene.addItem(dot)
             except Exception as e:
                 print(f"Error parsing path: {e}")
 
