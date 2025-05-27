@@ -1,22 +1,46 @@
 import os
 from svgpathtools import svg2paths, Path
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 
 from export_svg import export_piece_to_svg
 from models.pattern import Pattern
 from models.piece import Piece
 
-SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
-MERGE_PIECES = True
-ALLOWED_CLASS_LISTS = []
+# "profiles" for different sewing pattern sources
 
-SVG_FILE = os.path.join(os.getcwd(), "data", "example.svg")
-MERGE_PIECES = True
-ALLOWED_CLASS_LISTS = []
+# SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
+# MERGE_PIECES = True
+# ALLOWED_CLASS_LISTS = []
+
+# SVG_FILE = os.path.join(os.getcwd(), "data", "example.svg")
+# MERGE_PIECES = True
+# ALLOWED_CLASS_LISTS = []
 
 # SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
 # MERGE_PIECES = False
 # ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
+
+SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+MERGE_PIECES = False
+ALLOWED_CLASS_LISTS = []
+
+
+# seam information dataclasses
+@dataclass
+class Seampart:
+    part: str
+    start: tuple
+    end: tuple
+    direction: bool
+
+
+@dataclass
+class Seam:
+    id: int
+    seamparts: list
+
+# helpers for merging
 
 def __points_equal(p1: complex, p2: complex, tol: float = 1e-5) -> bool:
     return abs(p1.real - p2.real) < tol and abs(p1.imag - p2.imag) < tol
@@ -131,6 +155,48 @@ def load_selected_paths(svg_file: str) -> list:
     return selected_paths
 
 
+def parse_coord(coord_str: str) -> tuple:
+    x_str, y_str = coord_str.strip().split(",")
+    return float(x_str), float(y_str)
+
+
+def parse_svg_metadata(svg_path: str) -> list:
+    tree = ET.parse(svg_path)
+    root = tree.getroot()
+
+    ns = {'svg': 'http://www.w3.org/2000/svg'}
+    metadata = root.find('svg:metadata', ns) or root.find('metadata')
+    if metadata is None:
+        raise ValueError("No <metadata> tag found in SVG")
+
+    # seamdefinition has a weird namespace TODO
+    for child in metadata:
+        namespace = child.tag[1:].split("}")[0] if child.tag.startswith("{") else None
+        if child.tag.endswith('seamdefinition'):
+            seamdefinition = child
+            break
+    else:
+        raise ValueError("No <seamdefinition> tag found in metadata")
+
+    ns = f'{{{namespace}}}' if namespace else ''
+    seams = []
+
+    for seam_elem in seamdefinition.findall(f'{ns}seam'):
+        seam_id = int(seam_elem.find(f'{ns}id').text)
+        seamparts = []
+
+        for part_elem in seam_elem.findall(f'{ns}seampart'):
+            part = part_elem.find(f'{ns}part').text
+            start = parse_coord(part_elem.find(f'{ns}start').text)
+            end = parse_coord(part_elem.find(f'{ns}end').text)
+            direction = part_elem.find(f'{ns}direction').text.lower() == 'true'  # :/
+            seamparts.append(Seampart(part, start, end, direction))
+
+        seams.append(Seam(seam_id, seamparts))
+
+    return seams
+
+
 if __name__ == "__main__":
     if not os.path.exists(SVG_FILE):
             raise FileNotFoundError(f"SVG file not found: {SVG_FILE}")
@@ -143,8 +209,15 @@ if __name__ == "__main__":
         pieces.append(Piece(index, path))
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
-    full_pattern = Pattern(merged_pieces)
 
-    print(full_pattern)
+    seams = parse_svg_metadata(SVG_FILE)
+    for seam in seams:
+        print(f"Seam ID: {seam.id}")
+        for part in seam.seamparts:
+            print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}, Direction: {part.direction}")
+
+    full_pattern = Pattern(merged_pieces, seams)
+
+    # print(full_pattern)
     for piece in full_pattern.pieces:
         export_piece_to_svg(piece, f"piece_{piece.index}.svg", svg_attributes)
