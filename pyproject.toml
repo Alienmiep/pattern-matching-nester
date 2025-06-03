@@ -12,6 +12,7 @@ svgpathtools = "^1.7.0"
 svgwrite = "^1.4.3"
 svg-path = "^6.3"
 PyQt5 = "^5.15.11"
+lxml = "^5.4.0"
 
 
 [build-system]

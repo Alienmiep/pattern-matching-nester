@@ -1,5 +1,8 @@
 import os
-from svgpathtools import svg2paths, Path
+import re
+import math
+from svgpathtools import Path, parse_path
+import lxml.etree as ETree
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
@@ -17,13 +20,13 @@ from models.piece import Piece
 # MERGE_PIECES = True
 # ALLOWED_CLASS_LISTS = []
 
-# SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
-# MERGE_PIECES = False
-# ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
-
-SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
 MERGE_PIECES = False
-ALLOWED_CLASS_LISTS = []
+ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
+
+# SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+# MERGE_PIECES = False
+# ALLOWED_CLASS_LISTS = []
 
 
 # seam information dataclasses
@@ -146,13 +149,56 @@ def get_svg_attributes(svg_file: str) -> dict:
 
 
 def load_selected_paths(svg_file: str) -> list:
-    paths, attributes = svg2paths(svg_file)
+    tree = ETree.parse(svg_file)
+    root = tree.getroot()
     selected_paths = []
-    for path, attr in zip(paths, attributes):
-        class_list = attr.get('class', '').split()
-        if not ALLOWED_CLASS_LISTS or class_list in ALLOWED_CLASS_LISTS:
-            selected_paths.append(path)
+    for elem in root.iter():
+        if 'path' not in str(elem.tag):
+            continue
+
+        path_data = elem.attrib.get('d')
+        if not path_data:
+            continue
+
+        class_list = elem.attrib.get('class', '').split()
+        if ALLOWED_CLASS_LISTS and class_list not in ALLOWED_CLASS_LISTS:
+            continue
+
+        path = parse_path(path_data)
+
+        # Walk up the tree and apply any group transforms, starting at the element itself
+        current_elem = elem
+        while current_elem is not None:
+            transform_attr = current_elem.attrib.get('transform')
+            if transform_attr:
+                print(transform_attr)
+                path = apply_svg_transform(path, transform_attr)
+            current_elem = current_elem.getparent()
+        selected_paths.append(path)
+
     return selected_paths
+
+
+def apply_svg_transform(path: Path, transform_str: str) -> Path:
+    transform_regex = re.findall(r'(translate|scale|rotate)\(([^)]*)\)', transform_str)
+    for name, args in transform_regex:
+        values = list(map(float, re.findall(r'[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?', args)))
+
+        if name == "translate":
+            dx, dy = values if len(values) == 2 else (values[0], 0)
+            path = path.translated(complex(dx, dy))
+        elif name == "scale":
+            if len(values) == 1:
+                sx, sy = values[0], values[0]
+            else:
+                sx, sy = values
+            path = path.scaled(sx, sy)
+        elif name == "rotate":
+            angle_deg = values[0]
+            angle_rad = math.radians(-angle_deg)  # TODO check rotation (if that ever becomes relevant)
+            path = path.rotated(angle_rad)
+
+    return path
 
 
 def parse_coord(coord_str: str) -> tuple:
