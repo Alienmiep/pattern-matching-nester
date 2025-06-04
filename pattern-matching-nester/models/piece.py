@@ -3,18 +3,18 @@ from svgpathtools import Path, Line, Arc, CubicBezier, QuadraticBezier
 COORDINATE_DECIMAL_PLACES = 1
 
 class Piece():
-    def __init__(self, index: int, path: Path):
+    def __init__(self, index: int, path: Path, unit_scale: float):
         self.index = index
         self.path = path
-        self.vertices = self.__extract_vertices()
+        self.vertices = self.__extract_vertices(unit_scale)
 
     def __str__(self):
         return f"Index: {self.index}, Vertices: {self.vertices}"
 
-    def __extract_vertices(self, base_resolution=3.0, min_samples=3, max_samples=20) -> list:
+    def __extract_vertices(self, unit_scale, base_resolution=3.0, min_samples=3, max_samples=20) -> list:
         """
         Converts a Path into a list of (x, y) vertices.
-        - base_resolution: target spacing between points (in SVG units, e.g., mm)
+        - base_resolution: target spacing between points (in cm)
         - min_samples / max_samples: limits on sampling granularity
         """
         vertices = []
@@ -37,8 +37,8 @@ class Piece():
                 raise NotImplementedError(f"Unhandled segment type: {segment_type}")
 
             for pt in points:
-                x = float(round(pt.real, COORDINATE_DECIMAL_PLACES))
-                y = float(round(-pt.imag, COORDINATE_DECIMAL_PLACES))
+                x = float(round(pt.real * unit_scale, COORDINATE_DECIMAL_PLACES))
+                y = float(round(-pt.imag * unit_scale, COORDINATE_DECIMAL_PLACES))
                 if (x, y) not in vertices:
                     vertices.append((x, y))  # avoid duplicate points
 

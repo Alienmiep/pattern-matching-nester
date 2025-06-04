@@ -171,7 +171,6 @@ def load_selected_paths(svg_file: str) -> list:
         while current_elem is not None:
             transform_attr = current_elem.attrib.get('transform')
             if transform_attr:
-                print(transform_attr)
                 path = apply_svg_transform(path, transform_attr)
             current_elem = current_elem.getparent()
         selected_paths.append(path)
@@ -248,11 +247,13 @@ if __name__ == "__main__":
             raise FileNotFoundError(f"SVG file not found: {SVG_FILE}")
 
     svg_attributes = get_svg_attributes(SVG_FILE)
+    height = svg_attributes.get("height")
+    unit_scale = 0.1 if "mm" in height else 1
 
     paths = load_selected_paths(SVG_FILE)
     pieces = []
     for index, path in enumerate(paths):
-        pieces.append(Piece(index, path))
+        pieces.append(Piece(index, path, unit_scale))
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
 
