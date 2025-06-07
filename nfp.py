@@ -1,6 +1,10 @@
 from itertools import product
-from shapely.geometry import Polygon, Point
+from dataclasses import dataclass
+
+from shapely.geometry import Polygon
 from shapely.affinity import translate
+
+from helper import *
 
 a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 b_poly_untranslated = Polygon([(14, 6), (20, 6), (22, 12), (16, 10)])  # orbiting
@@ -33,27 +37,29 @@ if not shared_point.geom_type == 'Point':
 # store these touching pairs, along with the position of the touching vertex
 # at the current step, this should leave us with 4 pairs, even in the case of identical edges
 
-def incident_edges(polygon: Polygon, point: Point):
-    coords = list(polygon.exterior.coords)
-    point_xy = (point.x, point.y)
-    edges = []
-    for i in range(len(coords) - 1):  # skip closing segment
-        edge = (coords[i], coords[i + 1])
-        if point_xy in edge:
-            edges.append(edge)
-    return edges
-
 edges_poly_a = incident_edges(a_poly, shared_point)
 edges_poly_b = incident_edges(b_poly, shared_point)
 
 combinations = list(product(edges_poly_a, edges_poly_b))
-print(combinations)
-
 
 # these edge pairs can fall into three different cases:
 # (1) both touch in a vertex (like a V)
 # (2) orbiting edge touches middle of stationary edge (like a T)
 # (3) stationary edge touches the middle of orbiting edge (also like a T)
+
+@dataclass
+class EdgePair:
+    edge_a: tuple
+    edge_b: tuple
+    shared_vertex: tuple
+    edge_case: int
+
+touching_pairs = []
+for edge_pair in combinations:
+    edge_case = classify_edge_pair(edge_pair)
+    touching_pairs.append(EdgePair(edge_pair[0], edge_pair[1], shared_point, edge_case))
+
+print(touching_pairs)
 
 # 2b) create potential translation vectors
 # create translation vectors from these pairs
