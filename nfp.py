@@ -59,7 +59,6 @@ for edge_pair in combinations:
     edge_case = classify_edge_pair(edge_pair)
     touching_pairs.append(EdgePair(edge_pair[0], edge_pair[1], shared_point, edge_case))
 
-print(touching_pairs)
 
 # 2b) create potential translation vectors
 # create translation vectors from these pairs
@@ -69,6 +68,20 @@ print(touching_pairs)
 # (2) touching point -> stationary edge's end vertex
 # (3) touching point -> orbiting edge's end vertex AND reverse direction
 # (1) a little more complicated... (this is also the case that we start out with)
+
+potential_translation_vectors = []
+for pair in touching_pairs:
+    match pair.edge_case:
+        case 1:
+            pass
+        case 2:
+            potential_translation_vectors.append(vector_from_points(pair.shared_vertex, pair.edge_a[1]))
+        case 3:
+            translation = vector_from_points(pair.shared_vertex, pair.edge_a[1])
+            potential_translation_vectors.append((-translation[0], -translation[1]))
+
+print(potential_translation_vectors)
+
 
 # find out
 # - which part of the edges is touching and

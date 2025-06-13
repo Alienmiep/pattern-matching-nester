@@ -27,3 +27,9 @@ def classify_edge_pair(edge_pair: tuple) -> int:
         return 3
 
     return 0
+
+
+def vector_from_points(start: tuple, end: tuple) -> tuple:
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    return (dx, dy)
