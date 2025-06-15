@@ -14,13 +14,12 @@ fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 
 def vertices_to_qpainterpath(vertices: list):
     qp_path = QPainterPath()
-    first_x, first_y = vertices.pop(0)
+    first_x, first_y = vertices[0]
     qp_path.moveTo(first_x, first_y)
     for vertex in vertices:
         qp_path.lineTo(vertex[0], vertex[1])
-    # close polygon (if needed)
-    if vertex != (first_x, first_y):
-        qp_path.lineTo(first_x, first_y)
+    # close polygon
+    qp_path.lineTo(first_x, first_y)
     return qp_path
 
 class PathItem(QGraphicsPathItem):
@@ -112,32 +111,32 @@ class PolygonViewer(QMainWindow):
         side_layout.addWidget(self.translate_piece_button)
         self.translate_piece_button.clicked.connect(self.translate_piece)
 
-        # draw fabric
-        fabric_path = vertices_to_qpainterpath(fabric_vertices)
-        item = PathItem(fabric_path, {}, viewer=self)
-        self.scene.addItem(item)
+        # set up data structures
+        self.shapes = {
+            "fabric": fabric_vertices,
+            "initial_piece": input_points
+        }
+        self.points_of_interest = [reference_point]
 
         # draw pattern pieces and any highlighted vertices
         self.draw_everything()
 
     def draw_everything(self) -> None:
-        pattern_piece_path = vertices_to_qpainterpath(input_points)
-        item = PathItem(pattern_piece_path, {}, viewer=self)
-        self.scene.addItem(item)
+        self.scene.clear()
+        for shape in self.shapes.values():
+            shape_path = vertices_to_qpainterpath(shape)
+            item = PathItem(shape_path, {}, viewer=self)
+            self.scene.addItem(item)
 
-        # Add vertex dot for reference point
-        dot = VertexItem(QPointF(reference_point[0], reference_point[1]))
-        self.scene.addItem(dot)
+        # Add vertex dot for interesting points
+        for point in self.points_of_interest:
+            dot = VertexItem(QPointF(point[0], point[1]))
+            self.scene.addItem(dot)
 
     def show_ifp(self) -> None:
         ifp_vertices = ifp(input_points, fabric_vertices)
-        try:
-            ifp_path = vertices_to_qpainterpath(ifp_vertices)
-            # TODO draw path in red
-            item = PathItem(ifp_path, {}, viewer=self)
-            self.scene.addItem(item)
-        except Exception as e:
-            print(f"Error parsing path: {e}")
+        self.shapes["ifp"] = ifp_vertices
+        self.draw_everything()
 
     def translate_piece(self) -> None:
         # TODO translate piece:
