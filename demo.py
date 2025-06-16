@@ -29,7 +29,8 @@ class PathItem(QGraphicsPathItem):
         self.element = element
         self.viewer = viewer
         self.setAcceptHoverEvents(True)
-        self.setPen(QPen(Qt.black, 0.5))
+        color = QColor(attributes.get("color", "#000000"))
+        self.setPen(QPen(color, 0.5))
 
     def get_points(self):
         """Extract individual vertex positions from the QPainterPath."""
@@ -123,9 +124,12 @@ class PolygonViewer(QMainWindow):
 
     def draw_everything(self) -> None:
         self.scene.clear()
-        for shape in self.shapes.values():
+        for key, shape in self.shapes.items():
+            if "color" in key:
+                continue
             shape_path = vertices_to_qpainterpath(shape)
-            item = PathItem(shape_path, {}, viewer=self)
+            attributes = {"color": self.shapes[f"{key}_color"]} if f"{key}_color" in self.shapes else {}
+            item = PathItem(shape_path, attributes, viewer=self)
             self.scene.addItem(item)
 
         # Add vertex dot for interesting points
@@ -136,13 +140,17 @@ class PolygonViewer(QMainWindow):
     def show_ifp(self) -> None:
         ifp_vertices = ifp(input_points, fabric_vertices)
         self.shapes["ifp"] = ifp_vertices
+        self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
 
     def translate_piece(self) -> None:
-        # TODO translate piece:
-        # - keep reference of all pieces and their positions
-        # - redraw/refresh by calling "draw_everything()" again
-        pass
+        ifp_vertices_sorted_by_appeal = list(sorted(self.shapes["ifp"]))
+        target_point = ifp_vertices_sorted_by_appeal[0]
+        translation = (target_point[0] - reference_point[0], target_point[1] - reference_point[1])
+        self.shapes["initial_piece"] = [(x[0] + translation[0], x[1] + translation[1]) for x in input_points]
+        # translate reference point as well
+        self.points_of_interest = [(reference_point[0] + translation[0], reference_point[1] + translation[1])]
+        self.draw_everything()
 
 
 if __name__ == '__main__':
