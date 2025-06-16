@@ -1,6 +1,7 @@
-input_points = [(14.2, 147.0), (14.2, 154.0), (0.0, 154.0), (-14.2, 154.0), (-14.2, 147.0), (0.0, 147.0)]
+# input_points = [(14.2, 147.0), (14.2, 154.0), (0.0, 154.0), (-14.2, 154.0), (-14.2, 147.0), (0.0, 147.0)]
+input_points_local = [(180.1, 147.0), (170.3, 147.0), (160.5, 147.0), (160.5, 154.0), (170.3, 154.0), (180.1, 154.0)]
 
-reference_point = input_points[0]
+reference_point_local = input_points_local[0]
 
 fabric_length = 200  # = x
 fabric_width = 150   # = y
@@ -8,6 +9,8 @@ fabric_width = 150   # = y
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 
 def ifp(input_points: list, fabric_vertices: list) -> list:
+    reference_point = input_points[0]
+
     # Transpose the list of tuples to separate x and y values
     x_vals, y_vals = zip(*input_points)
 
@@ -20,18 +23,19 @@ def ifp(input_points: list, fabric_vertices: list) -> list:
     ifp_max_x = fabric_length - (max_x - reference_point[0])
     ifp_min_y = reference_point[1] - min_y
     ifp_max_y = fabric_width - (max_y - reference_point[1])
+    print(ifp_min_x, ifp_max_x)
 
     ifp = [(ifp_min_x, ifp_min_y), (ifp_max_x, ifp_min_y), (ifp_max_x, ifp_max_y), (ifp_min_x, ifp_max_y)]
     return ifp
 
 if __name__ == '__main__':
-    ifp_vertices = ifp(input_points, fabric_vertices)
+    ifp_vertices = ifp(input_points_local, fabric_vertices)
     ifp_vertices_sorted_by_appeal = list(sorted(ifp_vertices))  # built-in sort does x ascending, then y ascending, so leftest lowest point
     print(ifp_vertices_sorted_by_appeal)
 
     target_point = ifp_vertices_sorted_by_appeal[0]
-    translation = (target_point[0] - reference_point[0], target_point[1] - reference_point[1])
+    translation = (target_point[0] - reference_point_local[0], target_point[1] - reference_point_local[1])
     print(translation)
 
-    translated_input_points = [(x[0] + translation[0], x[1] + translation[1]) for x in input_points]
+    translated_input_points = [(x[0] + translation[0], x[1] + translation[1]) for x in input_points_local]
     print(translated_input_points)
