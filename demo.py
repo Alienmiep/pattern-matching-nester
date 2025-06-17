@@ -6,8 +6,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF
 
-from shapely import Polygon
+from shapely import MultiPolygon, Polygon
 from shapely.geometry import box
+from shapely.ops import unary_union
 
 from ifp import ifp
 
@@ -50,6 +51,48 @@ def bounding_box_from_polygon(poly_vertices: list) -> list:
     minx, miny, maxx, maxy = poly.bounds
     bbox = box(minx, miny, maxx, maxy)
     return list(bbox.exterior.coords)[:-1]  # cut off duplicate closing point
+
+
+def stretch_rectangle(rect: Polygon, offsets: tuple) -> Polygon:
+    """
+    Stretches an axis-aligned rectangle on the given axis.
+
+    Parameters:
+    - rect: A shapely Polygon representing a rectangle.
+    - offsets: amount to move the corresponding side (min_x, max_x, min_y, max_y).
+
+    Returns:
+    - A new Polygon with the stretched shape.
+    """
+    coords = list(rect.exterior.coords)[:-1]
+    minx, miny, maxx, maxy = rect.bounds
+    new_coords = []
+
+    for x, y in coords:
+        if x == maxx:
+            x += offsets[1]
+        if x == minx:
+            x -= offsets[0]
+        if y == maxy:
+            y += offsets[3]
+        if y == miny:
+            y -= offsets[2]
+        new_coords.append((x, y))
+    new_coords.append(new_coords[0])
+
+    return Polygon(new_coords)
+
+
+def simple_nfp(static_poly: Polygon, orbiting_poly: Polygon, reference_point: tuple) -> Polygon:
+    # assumption: 2 rectangles and reference point is on a corner
+    minx, miny, maxx, maxy = orbiting_poly.bounds
+    max_x_offset = reference_point[0] - minx  # the offset FOR max x
+    min_x_offset = maxx - reference_point[0]
+    max_y_offset = reference_point[1] - miny
+    min_y_offset = maxy - reference_point[1]
+    static_poly = stretch_rectangle(static_poly, (min_x_offset, max_x_offset, min_y_offset, max_y_offset))
+    return static_poly
+
 
 class PathItem(QGraphicsPathItem):
     def __init__(self, path: QPainterPath, attributes: dict, element=None, viewer=None):
@@ -210,14 +253,20 @@ class PolygonViewer(QMainWindow):
         self.draw_everything()
 
     def fit_next(self) -> None:
+        reference_point_piece = self.current_piece_vertices[0]
         main_polygon = Polygon(self.shapes["ifp"])
-        polygons_to_subtract = [Polygon(x) for key, x in self.shapes.items() if key not in ["fabric", "ifp", "ifp_color"]]
+        polygons_to_subtract = [Polygon(x) for key, x in self.shapes.items() if key not in ["fabric", "ifp", f"piece_{self.piece_no}"] and not "_color" in key]
+
         result = main_polygon
-        for poly in polygons_to_subtract:
-            result = result.difference(poly)
+        for index, poly in enumerate(polygons_to_subtract):
+            nfp = simple_nfp(poly, Polygon(self.current_piece_vertices), reference_point_piece)
+            self.shapes[f"nfp_{index}"] = list(nfp.exterior.coords)
+            self.shapes[f"nfp_{index}_color"] = "#0000FF"
+            result = result.difference(nfp)
+
         coords = list(result.exterior.coords)[:-1]
         target_point = min(coords, key=lambda p: (p[0], p[1]))
-        reference_point_piece = self.current_piece_vertices[0]
+
         translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
         self.shapes[f"piece_{self.piece_no}"] = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece_vertices]
         # translate reference point as well
