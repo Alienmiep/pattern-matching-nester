@@ -196,18 +196,36 @@ class PolygonViewer(QMainWindow):
         side_layout.addWidget(self.fit_next_button)
         self.fit_next_button.clicked.connect(self.fit_next)
 
+        self.advance_piece_button = QPushButton("3) Next piece")
+        side_layout.addWidget(self.advance_piece_button)
+        self.advance_piece_button.clicked.connect(self.advance_piece)
+
         # set up data structures
         self.shapes = {
             "fabric": fabric_vertices,
             "initial_piece": input_points
         }
         self.points_of_interest = [reference_point]
+        self.advance_piece()
+
+    def advance_piece(self) -> None:
+        if not remaining_pieces:
+            return
+
+        # remove previous polygons, if needed
+        self.shapes.pop("ifp", "")
+        keys_to_remove = []
+        for key in self.shapes:
+            if "nfp" in key:
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            self.shapes.pop(key)
+        self.points_of_interest = []
 
         self.current_piece = remaining_pieces.pop(0)
         self.current_piece_vertices = bounding_box_from_polygon(self.current_piece)
         self.piece_no = len(remaining_pieces) - remaining_piece_count + 1
 
-        # draw pattern pieces and any highlighted vertices
         self.draw_everything()
 
     def draw_everything(self) -> None:
@@ -241,7 +259,13 @@ class PolygonViewer(QMainWindow):
         self.draw_everything()
 
     def remove_ifp_rp(self) -> None:
-        self.shapes.pop("ifp")
+        self.shapes.pop("ifp", "")
+        keys_to_remove = []
+        for key in self.shapes:
+            if "nfp" in key:
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            self.shapes.pop(key)
         self.points_of_interest = []
         self.draw_everything()
 
