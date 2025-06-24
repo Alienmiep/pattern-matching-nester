@@ -343,8 +343,11 @@ class PolygonViewer(QMainWindow):
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
             result = result.difference(nfp)
 
-        coords = list(result.exterior.coords)[:-1]
-        target_point = min(coords, key=lambda p: (p[0], p[1]))
+        self.fabric_texture = generate_stripe_segments(result)
+        target_point = min(
+            (pt for line in self.fabric_texture for pt in line.coords),
+            key=lambda p: (p[0], p[1])
+        )
 
         translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
         self.shapes[f"piece_{self.piece_no}"] = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece_vertices]
