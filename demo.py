@@ -248,6 +248,8 @@ class PolygonViewer(QMainWindow):
 
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(None)
+        else:
+            self.fabric_texture = None
 
         self.points_of_interest = [reference_point]
         self.advance_piece()
@@ -270,7 +272,8 @@ class PolygonViewer(QMainWindow):
         self.current_piece_vertices = bounding_box_from_polygon(self.current_piece)
         self.piece_no = len(remaining_pieces) - remaining_piece_count + 1
 
-        self.fabric_texture = generate_stripe_segments(None)
+        if FABRIC_STRIPE_SWITCH:
+            self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def draw_everything(self) -> None:
@@ -297,7 +300,8 @@ class PolygonViewer(QMainWindow):
 
     def show_ifp(self) -> None:
         ifp_vertices = ifp(input_points, fabric_vertices)
-        self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
+        if FABRIC_STRIPE_SWITCH:
+            self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
         self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
@@ -320,14 +324,16 @@ class PolygonViewer(QMainWindow):
         for key in keys_to_remove:
             self.shapes.pop(key)
         self.points_of_interest = []
-        self.fabric_texture = generate_stripe_segments(None)
+        if FABRIC_STRIPE_SWITCH:
+            self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def next_ifp(self) -> None:
         self.shapes[f"piece_{self.piece_no}"] = self.current_piece_vertices
         self.points_of_interest = [self.current_piece_vertices[0]]
         ifp_vertices = ifp(self.current_piece_vertices, fabric_vertices)
-        self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
+        if FABRIC_STRIPE_SWITCH:
+            self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
         self.draw_everything()
 
@@ -343,11 +349,15 @@ class PolygonViewer(QMainWindow):
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
             result = result.difference(nfp)
 
-        self.fabric_texture = generate_stripe_segments(result)
-        target_point = min(
-            (pt for line in self.fabric_texture for pt in line.coords),
-            key=lambda p: (p[0], p[1])
-        )
+        if FABRIC_STRIPE_SWITCH:
+            self.fabric_texture = generate_stripe_segments(result)
+            target_point = min(
+                (pt for line in self.fabric_texture for pt in line.coords),
+                key=lambda p: (p[0], p[1])
+            )
+        else:  # just use IFP corner
+            coords = list(result.exterior.coords)[:-1]
+            target_point = min(coords, key=lambda p: (p[0], p[1]))
 
         translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
         self.shapes[f"piece_{self.piece_no}"] = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece_vertices]
