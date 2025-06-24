@@ -6,15 +6,17 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF
 
-from shapely import MultiPolygon, Polygon
+from shapely import Polygon, LineString, MultiLineString
 from shapely.geometry import box
-from shapely.ops import unary_union
 
 from ifp import ifp
 
 input_points = [(14.2, 147.0), (14.2, 154.0), (0.0, 154.0), (-14.2, 154.0), (-14.2, 147.0), (0.0, 147.0)]
 reference_point = input_points[0]
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
+stripe_spacing = 10
+
+FABRIC_STRIPE_SWITCH = True
 
 remaining_pieces = [
     [(180.1, 147.0), (170.3, 147.0), (160.5, 147.0), (160.5, 154.0), (170.3, 154.0), (180.1, 154.0)],
@@ -36,7 +38,7 @@ remaining_piece_count = 7
 # find viable area
 # translate piece
 
-def vertices_to_qpainterpath(vertices: list):
+def vertices_to_qpainterpath(vertices: list) -> QPainterPath:
     qp_path = QPainterPath()
     first_x, first_y = vertices[0]
     qp_path.moveTo(first_x, first_y)
@@ -46,11 +48,49 @@ def vertices_to_qpainterpath(vertices: list):
     qp_path.lineTo(first_x, first_y)
     return qp_path
 
+
+def linestrings_to_qpainterpath(lines: list) -> QPainterPath:
+    path = QPainterPath()
+    for line in lines:
+        coords = list(line.coords)
+        if not coords:
+            continue
+        path.moveTo(*coords[0])
+        for x, y in coords[1:]:
+            path.lineTo(x, y)
+    return path
+
+
 def bounding_box_from_polygon(poly_vertices: list) -> list:
     poly = Polygon(poly_vertices)
     minx, miny, maxx, maxy = poly.bounds
     bbox = box(minx, miny, maxx, maxy)
     return list(bbox.exterior.coords)[:-1]  # cut off duplicate closing point
+
+
+def generate_stripe_segments(ifp: Polygon) -> list:
+    if ifp is None:
+        ifp = Polygon(fabric_vertices)
+
+    x_min, y_min, x_max, y_max = ifp.bounds
+
+     # Generate horizontal stripe lines
+    stripe_lines = [
+        LineString([(x_min, y), (x_max, y)])
+        for y in range(int(y_min), int(y_max) + 1, stripe_spacing)
+    ]
+
+    # Intersect each line with the IFP and flatten results
+    result = []
+    for line in stripe_lines:
+        intersection = ifp.intersection(line)
+        if not intersection.is_empty:
+            if isinstance(intersection, LineString):
+                result.append(intersection)
+            elif isinstance(intersection, MultiLineString):
+                result.extend(intersection.geoms)
+
+    return result
 
 
 def stretch_rectangle(rect: Polygon, offsets: tuple) -> Polygon:
@@ -205,6 +245,10 @@ class PolygonViewer(QMainWindow):
             "fabric": fabric_vertices,
             "initial_piece": input_points
         }
+
+        if FABRIC_STRIPE_SWITCH:
+            self.fabric_texture = generate_stripe_segments(None)
+
         self.points_of_interest = [reference_point]
         self.advance_piece()
 
@@ -226,10 +270,13 @@ class PolygonViewer(QMainWindow):
         self.current_piece_vertices = bounding_box_from_polygon(self.current_piece)
         self.piece_no = len(remaining_pieces) - remaining_piece_count + 1
 
+        self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def draw_everything(self) -> None:
         self.scene.clear()
+        if self.fabric_texture:
+            self.draw_texture()
         for key, shape in self.shapes.items():
             if "color" in key:
                 continue
@@ -243,8 +290,14 @@ class PolygonViewer(QMainWindow):
             dot = VertexItem(QPointF(point[0], point[1]))
             self.scene.addItem(dot)
 
+    def draw_texture(self):
+        texture_path = linestrings_to_qpainterpath(self.fabric_texture)
+        item = PathItem(texture_path, {"color": "#bbbbbb"}, viewer=self)
+        self.scene.addItem(item)
+
     def show_ifp(self) -> None:
         ifp_vertices = ifp(input_points, fabric_vertices)
+        self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
         self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
@@ -267,12 +320,14 @@ class PolygonViewer(QMainWindow):
         for key in keys_to_remove:
             self.shapes.pop(key)
         self.points_of_interest = []
+        self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def next_ifp(self) -> None:
         self.shapes[f"piece_{self.piece_no}"] = self.current_piece_vertices
         self.points_of_interest = [self.current_piece_vertices[0]]
         ifp_vertices = ifp(self.current_piece_vertices, fabric_vertices)
+        self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
         self.draw_everything()
 
