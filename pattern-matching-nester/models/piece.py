@@ -7,6 +7,7 @@ class Piece():
         self.index = index
         self.path = path
         self.vertices = self.__extract_vertices(unit_scale)
+        self.aabb = None
 
     def __str__(self):
         return f"Index: {self.index}, Vertices: {self.vertices}"

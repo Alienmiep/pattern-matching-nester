@@ -1,3 +1,4 @@
+import os
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsView, QGraphicsScene, QGraphicsPathItem, QPushButton,
@@ -9,34 +10,22 @@ from PyQt5.QtCore import Qt, QPointF
 from shapely import Polygon, LineString, MultiLineString
 from shapely.geometry import box
 
+from models.piece import Piece
+from svg_helper import *
 from ifp import ifp
 
-input_points = [(14.2, 147.0), (14.2, 154.0), (0.0, 154.0), (-14.2, 154.0), (-14.2, 147.0), (0.0, 147.0)]
-reference_point = input_points[0]
+# "pattern profile"
+SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+MERGE_PIECES = False
+ALLOWED_CLASS_LISTS = []
+
+pieces = []  # gets filled before the app is loaded
+placed_pieces = []  # pieces move into this list once placed
+
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 stripe_spacing = 10
-
 FABRIC_STRIPE_SWITCH = True
 
-remaining_pieces = [
-    [(180.1, 147.0), (170.3, 147.0), (160.5, 147.0), (160.5, 154.0), (170.3, 154.0), (180.1, 154.0)],
-    [(80.1, 111.0), (35.4, 148.6), (33.3, 145.3), (31.9, 142.1), (31.2, 139.1), (30.9, 136.2), (30.9, 133.3), (31.0, 130.5), (31.1, 127.6), (31.0, 124.8), (30.5, 121.8), (69.5, 98.3)],
-    [(-80.1, 111.0), (-69.5, 98.3), (-30.5, 121.8), (-31.0, 124.8), (-31.1, 127.6), (-31.0, 130.5), (-30.9, 133.3), (-30.9, 136.2), (-31.2, 139.1), (-31.9, 142.1), (-33.3, 145.3), (-35.4, 148.6)],
-    [(0.0, 94.8), (28.2, 94.8), (36.5, 94.8), (36.5, 129.3), (33.2, 128.9), (30.5, 129.2), (28.1, 130.2), (26.1, 131.8), (24.3, 133.9), (22.7, 136.6), (21.3, 139.8), (19.9, 143.4), (18.4, 147.4), (18.0, 148.8), (17.5, 150.1), (17.0, 151.5), (9.3, 153.3), (8.5, 149.9), (6.4, 147.0), (3.5, 145.1), (0.0, 144.4), (-3.5, 145.1), (-6.4, 147.0), (-8.5, 149.9), (-9.3, 153.3), (-17.0, 151.5), (-17.5, 150.1), (-18.0, 148.8), (-18.4, 147.4), (-19.9, 143.4), (-21.3, 139.8), (-22.7, 136.6), (-24.3, 133.9), (-26.1, 131.8), (-28.1, 130.2), (-30.5, 129.2), (-33.2, 128.9), (-36.5, 129.3), (-36.5, 94.8), (-28.2, 94.8)],
-    [(170.3, 147.0), (173.5, 147.3), (176.7, 148.1), (179.6, 149.5), (187.3, 147.7), (186.2, 143.5), (185.3, 139.8), (184.7, 136.4), (184.5, 133.5), (184.9, 130.9), (185.9, 128.7), (187.6, 126.9), (190.3, 125.5), (190.3, 91.0), (170.3, 91.0), (150.3, 91.0), (150.3, 125.5), (152.9, 126.9), (154.7, 128.7), (155.7, 130.9), (156.0, 133.5), (155.8, 136.4), (155.2, 139.8), (154.3, 143.5), (153.3, 147.7), (160.9, 149.5), (163.9, 148.1), (167.0, 147.3)],
-    [(250.4, 111.0), (239.8, 98.3), (200.7, 121.8), (200.8, 124.6), (200.6, 127.4), (200.2, 130.3), (199.9, 133.1), (199.8, 136.1), (200.2, 139.1), (201.2, 142.2), (203.1, 145.3), (203.9, 146.5), (204.8, 147.6), (205.7, 148.6)],
-    [(90.1, 111.0), (134.9, 148.6), (135.8, 147.6), (136.6, 146.5), (137.5, 145.3), (139.3, 142.2), (140.3, 139.1), (140.7, 136.1), (140.7, 133.1), (140.4, 130.3), (140.0, 127.4), (139.8, 124.6), (139.8, 121.8), (100.8, 98.3)],
-]
-remaining_piece_count = 7
-
-# convert to shapely shape
-# get aabb
-# find reference point
-# draw reference point
-# find IFP
-# draw IFP
-# find viable area
-# translate piece
 
 def vertices_to_qpainterpath(vertices: list) -> QPainterPath:
     qp_path = QPainterPath()
@@ -216,49 +205,48 @@ class PolygonViewer(QMainWindow):
         layout.addWidget(self.view, 2)         # 2 parts
 
         # Buttons (to be pressed in order)
-        self.show_ifp_button = QPushButton("Show IFP")
-        side_layout.addWidget(self.show_ifp_button)
-        self.show_ifp_button.clicked.connect(self.show_ifp)
+        self.fit_all_button = QPushButton("Fit all pieces :)")
+        side_layout.addWidget(self.fit_all_button)
+        self.fit_all_button.clicked.connect(self.fit_all)
 
-        self.translate_piece_button = QPushButton("Translate pattern piece")
-        side_layout.addWidget(self.translate_piece_button)
-        self.translate_piece_button.clicked.connect(self.translate_piece)
-
-        self.remove_ifp_rp_button = QPushButton("Remove IFP and reference point")
-        side_layout.addWidget(self.remove_ifp_rp_button)
-        self.remove_ifp_rp_button.clicked.connect(self.remove_ifp_rp)
-
-        self.next_ifp_button = QPushButton("1) Show IFP for next piece")
-        side_layout.addWidget(self.next_ifp_button)
-        self.next_ifp_button.clicked.connect(self.next_ifp)
-
-        self.fit_next_button = QPushButton("2) Fit next piece")
-        side_layout.addWidget(self.fit_next_button)
-        self.fit_next_button.clicked.connect(self.fit_next)
-
-        self.advance_piece_button = QPushButton("3) Next piece")
+        self.advance_piece_button = QPushButton("1) Show next piece")
         side_layout.addWidget(self.advance_piece_button)
         self.advance_piece_button.clicked.connect(self.advance_piece)
 
+        self.show_ifp_button = QPushButton("2) Show IFP")
+        side_layout.addWidget(self.show_ifp_button)
+        self.show_ifp_button.clicked.connect(self.show_ifp)
+
+        self.fit_piece_button = QPushButton("3) Translate piece")
+        side_layout.addWidget(self.fit_piece_button)
+        self.fit_piece_button.clicked.connect(self.fit_piece)
+
+        self.clear_ifp_nfp_button = QPushButton("Remove IFP and NFPs")
+        side_layout.addWidget(self.clear_ifp_nfp_button)
+        self.clear_ifp_nfp_button.clicked.connect(self.clear_ifp_nfp)
+
         # set up data structures
         self.shapes = {
-            "fabric": fabric_vertices,
-            "initial_piece": input_points
+            "fabric": fabric_vertices
         }
+        self.points_of_interest = []
 
+        self.fabric_texture = generate_stripe_segments(None) if FABRIC_STRIPE_SWITCH else None
+        self.draw_everything()
+
+    def fit_all(self) -> None:
+        while pieces:
+            self.advance_piece()
+            self.show_ifp()
+            self.fit_piece()
+
+    def clear_ifp_nfp(self) -> None:
+        self.__clear_ifp_nfp()
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(None)
-        else:
-            self.fabric_texture = None
+        self.draw_everything()
 
-        self.points_of_interest = [reference_point]
-        self.advance_piece()
-
-    def advance_piece(self) -> None:
-        if not remaining_pieces:
-            return
-
-        # remove previous polygons, if needed
+    def __clear_ifp_nfp(self) -> None:
         self.shapes.pop("ifp", "")
         keys_to_remove = []
         for key in self.shapes:
@@ -268,9 +256,17 @@ class PolygonViewer(QMainWindow):
             self.shapes.pop(key)
         self.points_of_interest = []
 
-        self.current_piece = remaining_pieces.pop(0)
-        self.current_piece_vertices = bounding_box_from_polygon(self.current_piece)
-        self.piece_no = len(remaining_pieces) - remaining_piece_count + 1
+    def advance_piece(self) -> None:
+        if not pieces:
+            return
+
+        self.__clear_ifp_nfp()  # remove previous polygons, if needed
+        self.current_piece: Piece = pieces.pop(0)
+        self.current_piece_vertices_draw = self.current_piece.vertices
+        self.current_piece_vertices_calc = self.current_piece.aabb
+        self.points_of_interest = [self.current_piece.vertices[0]]
+
+        self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
 
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(None)
@@ -298,53 +294,43 @@ class PolygonViewer(QMainWindow):
         item = PathItem(texture_path, {"color": "#bbbbbb"}, viewer=self)
         self.scene.addItem(item)
 
+    def translate_current_piece(self, translation) -> None:
+        self.current_piece.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece.vertices]
+        self.current_piece.aabb = bounding_box_from_polygon(self.current_piece.vertices)
+        self.current_piece_vertices_draw = self.current_piece.vertices
+        self.current_piece_vertices_calc = self.current_piece.aabb
+        self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
+        self.points_of_interest = [self.current_piece.vertices[0]]
+
     def show_ifp(self) -> None:
-        ifp_vertices = ifp(input_points, fabric_vertices)
+        ifp_vertices = ifp(self.current_piece_vertices_calc, fabric_vertices)
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
         self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
 
-    def translate_piece(self) -> None:
+    def fit_first_piece(self) -> None:
+        reference_point = self.current_piece.vertices[0]
         ifp_vertices_sorted_by_appeal = list(sorted(self.shapes["ifp"]))
         target_point = ifp_vertices_sorted_by_appeal[0]
         translation = (target_point[0] - reference_point[0], target_point[1] - reference_point[1])
-        self.shapes["initial_piece"] = [(x[0] + translation[0], x[1] + translation[1]) for x in input_points]
-        # translate reference point as well
-        self.points_of_interest = [(reference_point[0] + translation[0], reference_point[1] + translation[1])]
+        self.translate_current_piece(translation)
+        placed_pieces.append(self.current_piece)
         self.draw_everything()
 
-    def remove_ifp_rp(self) -> None:
-        self.shapes.pop("ifp", "")
-        keys_to_remove = []
-        for key in self.shapes:
-            if "nfp" in key:
-                keys_to_remove.append(key)
-        for key in keys_to_remove:
-            self.shapes.pop(key)
-        self.points_of_interest = []
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(None)
-        self.draw_everything()
+    def fit_piece(self) -> None:
+        if not placed_pieces:
+            self.fit_first_piece()
+            return
 
-    def next_ifp(self) -> None:
-        self.shapes[f"piece_{self.piece_no}"] = self.current_piece_vertices
-        self.points_of_interest = [self.current_piece_vertices[0]]
-        ifp_vertices = ifp(self.current_piece_vertices, fabric_vertices)
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
-        self.shapes["ifp"] = ifp_vertices
-        self.draw_everything()
-
-    def fit_next(self) -> None:
-        reference_point_piece = self.current_piece_vertices[0]
+        reference_point_piece = self.current_piece_vertices_calc[0]
         main_polygon = Polygon(self.shapes["ifp"])
-        polygons_to_subtract = [Polygon(x) for key, x in self.shapes.items() if key not in ["fabric", "ifp", f"piece_{self.piece_no}"] and not "_color" in key]
+        polygons_to_subtract = [Polygon(x.aabb) for x in placed_pieces]
 
         result = main_polygon
         for index, poly in enumerate(polygons_to_subtract):
-            nfp = simple_nfp(poly, Polygon(self.current_piece_vertices), reference_point_piece)
+            nfp = simple_nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
             self.shapes[f"nfp_{index}"] = list(nfp.exterior.coords)
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
             result = result.difference(nfp)
@@ -360,12 +346,35 @@ class PolygonViewer(QMainWindow):
             target_point = min(coords, key=lambda p: (p[0], p[1]))
 
         translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
-        self.shapes[f"piece_{self.piece_no}"] = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece_vertices]
-        # translate reference point as well
-        self.points_of_interest = [(reference_point_piece[0] + translation[0], reference_point_piece[1] + translation[1])]
+        self.translate_current_piece(translation)
+        placed_pieces.append(self.current_piece)
         self.draw_everything()
 
 if __name__ == '__main__':
+    if not os.path.exists(SVG_FILE):
+            raise FileNotFoundError(f"SVG file not found: {SVG_FILE}")
+
+    svg_attributes = get_svg_attributes(SVG_FILE)
+    height = svg_attributes.get("height")
+    unit_scale = 0.1 if "mm" in height else 1
+
+    paths = load_selected_paths(SVG_FILE)
+
+    for index, path in enumerate(paths):
+        piece = Piece(index, path, unit_scale)
+        piece.aabb = bounding_box_from_polygon(piece.vertices)
+        pieces.append(piece)
+
+    # merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
+
+    # seams = parse_svg_metadata(SVG_FILE)
+    # for seam in seams:
+    #     print(f"Seam ID: {seam.id}")
+    #     for part in seam.seamparts:
+    #         print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}, Direction: {part.direction}")
+
+    # full_pattern = Pattern(merged_pieces, seams)
+
     app = QApplication(sys.argv)
     viewer = PolygonViewer()
     viewer.show()
