@@ -1,5 +1,5 @@
 import svgwrite
-
+from svgpathtools import wsvg
 
 def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     """Export a Piece object directly to an SVG file using its existing Path."""
@@ -21,3 +21,20 @@ def export_piece_to_svg(piece, filename, original_svg_attrs=None):
 
     dwg.add(dwg.path(d=svg_path_str, fill="none", stroke="black", stroke_width=0.2))
     dwg.save()
+
+
+
+def save_debug_svg(paths, filename="debug.svg", colors=None):
+    """
+    Save a list of svgpathtools.Path objects to an SVG file for inspection.
+
+    Arguments:
+        paths: list of Path objects
+        filename: string (output path)
+        colors: list of stroke colors (optional)
+    """
+    if colors is None:
+        # Default to black strokes
+        colors = ["black"] * len(paths)
+
+    wsvg(paths, filename=filename, stroke_widths=[1]*len(paths), colors=colors)

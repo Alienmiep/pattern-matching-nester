@@ -6,7 +6,7 @@ import lxml.etree as ETree
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
-from export_svg import export_piece_to_svg
+from export_svg import export_piece_to_svg, save_debug_svg
 from models.pattern import Pattern
 from models.piece import Piece
 
@@ -14,19 +14,21 @@ from models.piece import Piece
 
 # SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
 # MERGE_PIECES = True
+# MERGE_SLEEVES = True
 # ALLOWED_CLASS_LISTS = []
 
 # SVG_FILE = os.path.join(os.getcwd(), "data", "example.svg")
 # MERGE_PIECES = True
 # ALLOWED_CLASS_LISTS = []
 
-SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
-MERGE_PIECES = False
-ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
-
-# SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+# SVG_FILE = os.path.join(os.getcwd(), "data", "freesewing-huey.svg")
 # MERGE_PIECES = False
-# ALLOWED_CLASS_LISTS = []
+# ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
+
+SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+MERGE_PIECES = False
+MERGE_SLEEVES = True
+ALLOWED_CLASS_LISTS = []
 
 
 # seam information dataclasses
@@ -152,6 +154,7 @@ def load_selected_paths(svg_file: str) -> list:
     tree = ETree.parse(svg_file)
     root = tree.getroot()
     selected_paths = []
+    sleeve_paths = []
     for elem in root.iter():
         if 'path' not in str(elem.tag):
             continue
@@ -173,9 +176,133 @@ def load_selected_paths(svg_file: str) -> list:
             if transform_attr:
                 path = apply_svg_transform(path, transform_attr)
             current_elem = current_elem.getparent()
+
+        # sort out sleeves to merge them (if needed)
+        if MERGE_SLEEVES:
+            name_attr = elem.attrib.get('name')
+            if name_attr and 'sleeve' in name_attr.lower():
+                sleeve_paths.append(path_data)
+                continue
         selected_paths.append(path)
 
+    if sleeve_paths:
+        sleeve_paths = prepare_sleeve_paths_for_merge(sleeve_paths)
+
+    selected_paths.extend(sleeve_paths)
     return selected_paths
+
+
+def prepare_sleeve_paths_for_merge(path_strs: list) -> list:
+    if len(path_strs) not in (2, 4):
+        raise ValueError(f"Expected 2 or 4 sleeve paths, got {len(path_strs)}")
+
+    # Get min and max x for each path
+    bounds = [(i, *get_path_extreme_x(d)) for i, d in enumerate(path_strs)]
+
+    # Find the outermost paths
+    min_x_idx = min(bounds, key=lambda b: b[1])[0]
+    max_x_idx = max(bounds, key=lambda b: b[2])[0]
+
+    # Get their path strings
+    min_path_str = path_strs[min_x_idx]
+    max_path_str = path_strs[max_x_idx]
+
+    merged_paths = align_sleeve_halves(min_path_str, max_path_str)
+
+    # If we have 4 paths, merge the remaining pair
+    if len(path_strs) == 4:
+        remaining_indices = set(range(4)) - {min_x_idx, max_x_idx}
+        i1, i2 = list(remaining_indices)
+        p1, p2 = path_strs[i1], path_strs[i2]
+
+        # Decide which of the two remaining has the lower min-x
+        min_x1, max_x1 = get_path_extreme_x(p1)
+        min_x2, max_x2 = get_path_extreme_x(p2)
+
+        if min_x1 <= min_x2:
+            merged_paths.extend(align_sleeve_halves(p2, p1))
+        else:
+            merged_paths.extend(align_sleeve_halves(p1, p2))
+
+    return merged_paths
+
+
+def get_path_extreme_x(path_str):
+    path = parse_path(path_str)
+    xs = [seg.start.real for seg in path] + [seg.end.real for seg in path]
+    return min(xs), max(xs)
+
+
+def align_sleeve_halves(min_path_str: str, max_path_str: str):
+    min_path = parse_path(min_path_str)
+    max_path = parse_path(max_path_str)
+    v1, n1 = get_sleeve_edge_vertices(min_path, mode='min')
+    v2, n2 = get_sleeve_edge_vertices(max_path, mode='max')
+    min_path_rotated = rotate_path_to_horizontal(min_path, v1, n1)
+    max_path_rotated = rotate_path_to_horizontal(max_path, v2, n2)
+
+    midpoint = (v1 + v2) / 2
+    min_offset = midpoint - v1
+    max_offset = midpoint - v2
+    aligned_min_path = min_path_rotated.translated(min_offset)
+    aligned_max_path = max_path_rotated.translated(max_offset)
+
+    return [aligned_min_path, aligned_max_path]
+
+
+def get_sleeve_edge_vertices(path, mode='min'):
+    """
+    Given a Path object and mode ('min' or 'max'), returns the target edge as (vertex, neighbor),
+    where:
+        - vertex is the extreme-x point (min or max)
+        - neighbor is the adjacent point with the lowest y
+    The "target edge" in this context is essentially the fold line of the sleeve, the one where GarmentCode makes a cut
+    """
+    # Convert to a flat list of points
+    points = []
+    for seg in path:
+        points.append(seg.start)
+
+    # Find index of extreme x point
+    if mode == 'min':
+        index = min(range(len(points)), key=lambda i: points[i].real)
+    elif mode == 'max':
+        index = max(range(len(points)), key=lambda i: points[i].real)
+    else:
+        raise ValueError("mode must be 'min' or 'max'")
+
+    current = points[index]
+    prev = points[index - 1 if index > 0 else -1]
+    next = points[(index + 1) % len(points)]
+
+    # Choose neighbor with lowest y
+    neighbor = prev if prev.imag < next.imag else next
+
+    return current, neighbor
+
+
+def rotate_path_to_horizontal(path: Path, edge_start, edge_end):
+    dx = edge_end.real - edge_start.real
+    dy = edge_end.imag - edge_start.imag
+
+    angle = math.degrees(-math.atan2(dy, dx) - math.pi / 2)  # negative to rotate toward +x axis
+
+    # Translate so edge_start is at origin
+    translated = path.translated(-edge_start)
+
+    # Rotate path around origin
+    rotated = translated.rotated(angle, 0)
+
+    # Translate back to original position
+    restored = rotated.translated(edge_start)
+
+    # save_debug_svg(
+    #     [path, restored],
+    #     filename=f"rotated_test_{angle}.svg",
+    #     colors=["red", "blue"]
+    # )
+
+    return restored
 
 
 def apply_svg_transform(path: Path, transform_str: str) -> Path:
@@ -251,9 +378,13 @@ if __name__ == "__main__":
     unit_scale = 0.1 if "mm" in height else 1
 
     paths = load_selected_paths(SVG_FILE)
+    print(paths[4:])
     pieces = []
     for index, path in enumerate(paths):
         pieces.append(Piece(index, path, unit_scale))
+
+    for piece in pieces[4:]:
+        print(piece.vertices)
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
 
@@ -268,3 +399,15 @@ if __name__ == "__main__":
     # print(full_pattern)
     for piece in full_pattern.pieces:
         export_piece_to_svg(piece, f"piece_{piece.index}.svg", svg_attributes)
+
+    # put fabric into place
+    #   generate rectangle with given size
+    #   display rectangle
+    # select first piece (first in list)
+    # select reference point of piece (first vertex in list)
+    # generate IFP with fabric
+    #   done for rectangles
+    # choose leftest lowest corner of IFP (find minimums, x first)
+    # translate piece into a way where the reference point lines up with the leftest lowest point
+    #   calculate translation
+    #   apply it
