@@ -23,6 +23,18 @@ def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     dwg.save()
 
 
+def export_full_pattern(pattern, filename, original_svg_attrs=None):
+    dwg = svgwrite.Drawing(filename, profile='tiny')
+
+    # Use svgpathtools to get the SVG path string
+    for piece in pattern.pieces:
+        svg_path_str = piece.path.d() + "Z"
+        if original_svg_attrs:
+            for k, v in original_svg_attrs.items():
+                dwg.attribs[k] = v
+        dwg.add(dwg.path(d=svg_path_str, fill="none", stroke="black", stroke_width=0.2))
+    dwg.save()
+
 
 def save_debug_svg(paths, filename="debug.svg", colors=None):
     """

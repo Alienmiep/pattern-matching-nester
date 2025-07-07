@@ -6,7 +6,7 @@ import lxml.etree as ETree
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
-from export_svg import export_piece_to_svg, save_debug_svg
+from export_svg import export_piece_to_svg, save_debug_svg, export_full_pattern
 from models.pattern import Pattern
 from models.piece import Piece
 
@@ -220,9 +220,9 @@ def prepare_sleeve_paths_for_merge(path_strs: list) -> list:
         min_x2, max_x2 = get_path_extreme_x(p2)
 
         if min_x1 <= min_x2:
-            merged_paths.extend(align_sleeve_halves(p2, p1))
+            merged_paths.extend(align_sleeve_halves(p2, p1, 20))
         else:
-            merged_paths.extend(align_sleeve_halves(p1, p2))
+            merged_paths.extend(align_sleeve_halves(p1, p2, 20))
 
     return merged_paths
 
@@ -233,7 +233,7 @@ def get_path_extreme_x(path_str):
     return min(xs), max(xs)
 
 
-def align_sleeve_halves(min_path_str: str, max_path_str: str):
+def align_sleeve_halves(min_path_str: str, max_path_str: str, offset: int=0):
     min_path = parse_path(min_path_str)
     max_path = parse_path(max_path_str)
     v1, n1 = get_sleeve_edge_vertices(min_path, mode='min')
@@ -241,7 +241,7 @@ def align_sleeve_halves(min_path_str: str, max_path_str: str):
     min_path_rotated = rotate_path_to_horizontal(min_path, v1, n1)
     max_path_rotated = rotate_path_to_horizontal(max_path, v2, n2)
 
-    midpoint = (v1 + v2) / 2
+    midpoint = (v1 + v2) / 2 + offset
     min_offset = midpoint - v1
     max_offset = midpoint - v2
     aligned_min_path = min_path_rotated.translated(min_offset)
@@ -399,6 +399,8 @@ if __name__ == "__main__":
     # print(full_pattern)
     for piece in full_pattern.pieces:
         export_piece_to_svg(piece, f"piece_{piece.index}.svg", svg_attributes)
+
+    export_full_pattern(full_pattern, "full_pattern.svg", svg_attributes)
 
     # put fabric into place
     #   generate rectangle with given size
