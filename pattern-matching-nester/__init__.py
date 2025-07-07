@@ -26,7 +26,7 @@ from models.piece import Piece
 # ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
 
 SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
-MERGE_PIECES = False
+MERGE_PIECES = True
 MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
 
@@ -127,7 +127,7 @@ def merge_pieces_with_common_vertices(pieces: list) -> list:
                 match_found = True
                 pieces.remove(p)  # <- allows for only one match, so only 2 pieces can be merged together
                 new_path = combine_paths(piece.path, p.path)
-                merged_pieces.append(Piece(-1, new_path))
+                merged_pieces.append(Piece(-1, new_path, unit_scale))
         if not match_found:
             merged_pieces.append(piece)
     return merged_pieces
@@ -378,13 +378,9 @@ if __name__ == "__main__":
     unit_scale = 0.1 if "mm" in height else 1
 
     paths = load_selected_paths(SVG_FILE)
-    print(paths[4:])
     pieces = []
     for index, path in enumerate(paths):
         pieces.append(Piece(index, path, unit_scale))
-
-    for piece in pieces[4:]:
-        print(piece.vertices)
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
 
