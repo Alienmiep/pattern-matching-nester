@@ -15,7 +15,7 @@ from svg_helper import *
 from ifp import ifp
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+SVG_FILE = os.path.join(os.getcwd(), "full_pattern.svg")
 MERGE_PIECES = False
 ALLOWED_CLASS_LISTS = []
 

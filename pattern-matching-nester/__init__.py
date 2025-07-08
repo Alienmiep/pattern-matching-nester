@@ -12,10 +12,10 @@ from models.piece import Piece
 
 # "profiles" for different sewing pattern sources
 
-# SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
-# MERGE_PIECES = True
-# MERGE_SLEEVES = True
-# ALLOWED_CLASS_LISTS = []
+SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
+MERGE_PIECES = True
+MERGE_SLEEVES = True
+ALLOWED_CLASS_LISTS = []
 
 # SVG_FILE = os.path.join(os.getcwd(), "data", "example.svg")
 # MERGE_PIECES = True
@@ -25,10 +25,10 @@ from models.piece import Piece
 # MERGE_PIECES = False
 # ALLOWED_CLASS_LISTS = [["fabric"], ["various"]]
 
-SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
-MERGE_PIECES = True
-MERGE_SLEEVES = True
-ALLOWED_CLASS_LISTS = []
+# SVG_FILE = os.path.join(os.getcwd(), "pattern.svg")
+# MERGE_PIECES = True
+# MERGE_SLEEVES = True
+# ALLOWED_CLASS_LISTS = []
 
 
 # seam information dataclasses
@@ -384,11 +384,12 @@ if __name__ == "__main__":
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
 
-    seams = parse_svg_metadata(SVG_FILE)
-    for seam in seams:
-        print(f"Seam ID: {seam.id}")
-        for part in seam.seamparts:
-            print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}, Direction: {part.direction}")
+    # seams = parse_svg_metadata(SVG_FILE)
+    # for seam in seams:
+    #     print(f"Seam ID: {seam.id}")
+    #     for part in seam.seamparts:
+    #         print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}, Direction: {part.direction}")
+    seams = []
 
     full_pattern = Pattern(merged_pieces, seams)
 
