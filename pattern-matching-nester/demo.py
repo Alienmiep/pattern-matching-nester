@@ -15,12 +15,10 @@ from svg_helper import *
 from ifp import ifp
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "full_pattern.svg")
-MERGE_PIECES = False
+SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
+MERGE_PIECES = True
+MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
-
-pieces = []  # gets filled before the app is loaded
-placed_pieces = []  # pieces move into this list once placed
 
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 stripe_spacing = 10
@@ -174,8 +172,10 @@ class ZoomableGraphicsView(QGraphicsView):
 
 
 class PolygonViewer(QMainWindow):
-    def __init__(self):
+    def __init__(self, pieces: list):
         super().__init__()
+        self.pieces = pieces
+        self.placed_pieces = []
         self.setWindowTitle("Interactive Algorithm Demo")
         self.setGeometry(100, 100, 800, 600)
         self.showMaximized()
@@ -235,7 +235,7 @@ class PolygonViewer(QMainWindow):
         self.draw_everything()
 
     def fit_all(self) -> None:
-        while pieces:
+        while self.pieces:
             self.advance_piece()
             self.show_ifp()
             self.fit_piece()
@@ -257,11 +257,13 @@ class PolygonViewer(QMainWindow):
         self.points_of_interest = []
 
     def advance_piece(self) -> None:
-        if not pieces:
+        if not self.pieces:
             return
 
         self.__clear_ifp_nfp()  # remove previous polygons, if needed
-        self.current_piece: Piece = pieces.pop(0)
+        self.current_piece: Piece = self.pieces.pop(0)
+        if not self.current_piece.aabb:
+            self.current_piece.aabb = bounding_box_from_polygon(self.current_piece.vertices)
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.aabb
         self.points_of_interest = [self.current_piece.vertices[0]]
@@ -316,17 +318,17 @@ class PolygonViewer(QMainWindow):
         target_point = ifp_vertices_sorted_by_appeal[0]
         translation = (target_point[0] - reference_point[0], target_point[1] - reference_point[1])
         self.translate_current_piece(translation)
-        placed_pieces.append(self.current_piece)
+        self.placed_pieces.append(self.current_piece)
         self.draw_everything()
 
     def fit_piece(self) -> None:
-        if not placed_pieces:
+        if not self.placed_pieces:
             self.fit_first_piece()
             return
 
         reference_point_piece = self.current_piece_vertices_calc[0]
         main_polygon = Polygon(self.shapes["ifp"])
-        polygons_to_subtract = [Polygon(x.aabb) for x in placed_pieces]
+        polygons_to_subtract = [Polygon(x.aabb) for x in self.placed_pieces]
 
         result = main_polygon
         for index, poly in enumerate(polygons_to_subtract):
@@ -347,7 +349,7 @@ class PolygonViewer(QMainWindow):
 
         translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
         self.translate_current_piece(translation)
-        placed_pieces.append(self.current_piece)
+        self.placed_pieces.append(self.current_piece)
         self.draw_everything()
 
 if __name__ == '__main__':
@@ -360,12 +362,13 @@ if __name__ == '__main__':
 
     paths = load_selected_paths(SVG_FILE)
 
+    pieces = []
     for index, path in enumerate(paths):
         piece = Piece(index, path, unit_scale)
         piece.aabb = bounding_box_from_polygon(piece.vertices)
         pieces.append(piece)
 
-    # merged_pieces = reindex(merge_pieces_with_common_vertices(pieces)) if MERGE_PIECES else pieces
+    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
 
     # seams = parse_svg_metadata(SVG_FILE)
     # for seam in seams:
@@ -376,6 +379,6 @@ if __name__ == '__main__':
     # full_pattern = Pattern(merged_pieces, seams)
 
     app = QApplication(sys.argv)
-    viewer = PolygonViewer()
+    viewer = PolygonViewer(merged_pieces)
     viewer.show()
     sys.exit(app.exec_())
