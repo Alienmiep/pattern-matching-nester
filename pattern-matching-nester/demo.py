@@ -266,7 +266,7 @@ class PolygonViewer(QMainWindow):
             self.current_piece.aabb = bounding_box_from_polygon(self.current_piece.vertices)
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.aabb
-        self.points_of_interest = [self.current_piece.vertices[0]]
+        self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
 
@@ -302,7 +302,7 @@ class PolygonViewer(QMainWindow):
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.aabb
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
-        self.points_of_interest = [self.current_piece.vertices[0]]
+        self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
 
     def show_ifp(self) -> None:
         ifp_vertices = ifp(self.current_piece_vertices_calc, fabric_vertices)
@@ -313,7 +313,7 @@ class PolygonViewer(QMainWindow):
         self.draw_everything()
 
     def fit_first_piece(self) -> None:
-        reference_point = self.current_piece.vertices[0]
+        reference_point = min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))
         ifp_vertices_sorted_by_appeal = list(sorted(self.shapes["ifp"]))
         target_point = ifp_vertices_sorted_by_appeal[0]
         translation = (target_point[0] - reference_point[0], target_point[1] - reference_point[1])
@@ -326,7 +326,7 @@ class PolygonViewer(QMainWindow):
             self.fit_first_piece()
             return
 
-        reference_point_piece = self.current_piece_vertices_calc[0]
+        reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
         main_polygon = Polygon(self.shapes["ifp"])
         polygons_to_subtract = [Polygon(x.aabb) for x in self.placed_pieces]
 
@@ -369,6 +369,12 @@ if __name__ == '__main__':
         pieces.append(piece)
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
+    for p in merged_pieces:
+        print(f"Piece {p.index}, Area: {p.area()}")
+    print("-------")
+    merged_pieces.sort(key=lambda p: p.area(), reverse=True)
+    for p in merged_pieces:
+        print(f"Piece {p.index}, Area: {p.area()}")
 
     # seams = parse_svg_metadata(SVG_FILE)
     # for seam in seams:

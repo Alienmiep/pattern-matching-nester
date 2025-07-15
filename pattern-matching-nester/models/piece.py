@@ -1,4 +1,5 @@
 from svgpathtools import Path, Line, Arc, CubicBezier, QuadraticBezier
+from shapely.geometry import Polygon
 
 COORDINATE_DECIMAL_PLACES = 1
 
@@ -44,3 +45,7 @@ class Piece():
                     vertices.append((x, y))  # avoid duplicate points
 
         return vertices
+
+    def area(self):
+        polygon = Polygon(self.vertices)
+        return polygon.area

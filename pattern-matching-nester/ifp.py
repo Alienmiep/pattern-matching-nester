@@ -9,7 +9,7 @@ fabric_width = 150   # = y
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 
 def ifp(input_points: list, fabric_vertices: list) -> list:
-    reference_point = input_points[0]
+    reference_point = min(input_points, key=lambda v: (v[0], v[1]))
 
     # Transpose the list of tuples to separate x and y values
     x_vals, y_vals = zip(*input_points)
