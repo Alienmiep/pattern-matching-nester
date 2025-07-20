@@ -67,7 +67,7 @@ def is_left_or_right(edge_a: LineString, edge_b: LineString) -> str:
     # point A: non-touching point of edge_b
     # point B: start of edge_a
     # point C: end of edge_a
-    point_a = edge_b.coords[0] if edge_b.coords[0] not in list (edge_a.coords) else edge_b.coords[1]
+    point_a = edge_b.coords[0] if edge_b.coords[0] not in list(edge_a.coords) else edge_b.coords[1]
     point_b = edge_a.coords[0]
     point_c = edge_a.coords[1]
     angle = angle_from_points(point_a, point_b, point_c)
@@ -92,6 +92,25 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> 
         if value == [edge_a_part, edge_b_part, relative_posiion]:
             return key
     return 0
+
+def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
+    translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
+    point_b = (pair.shared_vertex.x, pair.shared_vertex.y)  # ended up being the same for all cases
+    match pair.edge_case:
+        case 1:
+            point_a = pair.edge_b.coords[0] if pair.edge_b.coords[0] not in list(pair.edge_a.coords) else pair.edge_b.coords[1]  # non-touching point on edge_b
+            point_c = pair.edge_a.coords[0] if pair.edge_a.coords[0] not in list(pair.edge_b.coords) else pair.edge_a.coords[1]  # non-touching point on edge_a
+            feasible_range = angle_from_points(point_a, point_b, point_c) + 180
+
+            translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, point_c)
+            return bool(translation_vector_angle <= feasible_range)
+        case 2:
+            translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, pair.edge_a.coords[1])
+            return bool(translation_vector_angle <= 180)
+        case 3:
+            translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, pair.edge_b.coords[0])
+            return bool(translation_vector_angle <= 180)
+
 
 # ----- more general helpers -----
 

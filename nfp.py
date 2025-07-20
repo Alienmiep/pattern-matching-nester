@@ -1,6 +1,6 @@
 from itertools import product
 
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon
 from shapely.affinity import translate
 
 import helper
@@ -30,6 +30,7 @@ shared_point = a_poly.intersection(b_poly)
 
 if not shared_point.geom_type == 'Point':
     raise Exception("Polygons seem to overlap")
+    # TODO this also "fires" if the polygons touch in two points
 
 
 # 2. orbiting
@@ -82,21 +83,25 @@ for pair in touching_pairs:
 print(potential_translation_vectors)
 
 
-# find out
-# - which part of the edges is touching and
-# - whether orbiting edge b is left or right of stationary edge b (so by x value of non-touching point)
-# then consult Table 1 as to which edge to use as a translation vector
-
-# not all edge pairs will result in a translation vector and that is okay
-
 # 2c) find feasible translation
 # choose a translation vector that doesn't immediately cause an intersection :)
 # consult touching edge pairs list to find it
 # each of these pairs defines an angular range within which a translation vector is allowed
 # and the candidate translation vector has to fit into all of them
 
-# case (1) should be angle between the vectors + 180°
+# case (1) feasible range should be angle between the vectors + 180°
 # cases (2) and (3) need the "correct" 180°
+
+feasible_translation_vectors = []
+for translation_vector in potential_translation_vectors:
+    is_feasible = True
+    for pair in touching_pairs:
+        is_feasible = is_feasible and helper.is_in_feasible_range(translation_vector, pair)
+    if is_feasible:
+        feasible_translation_vectors.append(translation_vector)
+
+print(feasible_translation_vectors)
+
 
 # 2d) trim feasible translation
 # 2e) apply feasible translation
