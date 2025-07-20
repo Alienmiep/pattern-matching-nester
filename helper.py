@@ -1,4 +1,15 @@
+import math
+from dataclasses import dataclass
+
 from shapely.geometry import Polygon, Point, LineString
+
+@dataclass
+class EdgePair:
+    edge_a: LineString
+    edge_b: LineString
+    shared_vertex: Point
+    edge_case: int
+
 
 def incident_edges(polygon: Polygon, point: Point) -> list:
     coords = list(polygon.exterior.coords)
@@ -29,7 +40,79 @@ def classify_edge_pair(edge_pair: tuple) -> int:
     return 0
 
 
+def translation_vector_from_edge_pair(pair: EdgePair) -> tuple | None:
+    # 1. find out whether the touching vertex is start of end of a/b
+    edge_a_part = "start" if Point(pair.edge_a.coords[0]) == pair.shared_vertex else "end"
+    edge_b_part = "start" if Point(pair.edge_b.coords[0]) == pair.shared_vertex else "end"
+
+    # 2. find out if edge b is left or right (or parallel) of edge a
+    relative_position = is_left_or_right(pair.edge_a, pair.edge_b)
+
+    # 3. get case and return translation vector (or None, that's fine too)
+    match(get_edge_case(edge_a_part, edge_b_part, relative_position)):
+        case 1 | 6 | 8:
+            return vector_from_points(pair.edge_b.coords[1], pair.edge_b.coords[0])  # reverse direction here
+        case 2 | 4:
+            return vector_from_points(pair.edge_a.coords[0], pair.edge_a.coords[1])
+        case 3 | 5 | 7:
+            return None
+        case _:
+            raise Exception("Edge pair case could not be resolved")
+
+
+def is_left_or_right(edge_a: LineString, edge_b: LineString) -> str:
+    if list(edge_a.coords) == list(edge_b.coords) or list(edge_a.coords) == list(edge_b.coords)[::-1]:
+        return "parallel"
+
+    # point A: non-touching point of edge_b
+    # point B: start of edge_a
+    # point C: end of edge_a
+    point_a = edge_b.coords[0] if edge_b.coords[0] not in list (edge_a.coords) else edge_b.coords[1]
+    point_b = edge_a.coords[0]
+    point_c = edge_a.coords[1]
+    angle = angle_from_points(point_a, point_b, point_c)
+    return "left" if angle > 180 else "right"
+
+
+def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> int:
+    if relative_posiion == "parallel":
+        return 8
+    elif edge_a_part == "end" and edge_b_part == "end":
+        return 7
+
+    case_table = {
+        1: ["start", "start", "left"],
+        2: ["start", "start", "right"],
+        3: ["start", "end", "left"],
+        4: ["start", "end", "right"],
+        5: ["end", "start", "left"],
+        6: ["end", "start", "right"],
+    }
+    for key, value in case_table.items():
+        if value == [edge_a_part, edge_b_part, relative_posiion]:
+            return key
+    return 0
+
+# ----- more general helpers -----
+
 def vector_from_points(start: tuple, end: tuple) -> tuple:
     dx = end[0] - start[0]
     dy = end[1] - start[1]
     return (dx, dy)
+
+
+def angle_from_points(point_a: tuple, point_b: tuple, point_c: tuple) -> float:
+    ba = vector_from_points(point_b, point_a)
+    bc = vector_from_points(point_b, point_c)
+
+    dot = ba[0] * bc[0] + ba[1] * bc[1]
+    cross = ba[0] * bc[1] - ba[1] * bc[0]
+
+    angle_rad = math.atan2(cross, dot)
+    angle_deg = math.degrees(angle_rad)
+
+    # Normalize to [0, 360)
+    if angle_deg < 0:
+        angle_deg += 360
+
+    return angle_deg
