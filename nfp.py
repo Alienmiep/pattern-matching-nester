@@ -14,6 +14,7 @@ b_poly_untranslated = Polygon([(14, 6), (20, 6), (22, 12), (16, 10)])  # orbitin
 # TODO more advanced version where you give a reference point and then try to find a touching, non-intersecting position for b_poly
 # find lowest y point of A pt_a_ymin
 pt_a_ymin = min(a_poly.exterior.coords, key=lambda p: p[1])
+nfp = [pt_a_ymin]
 
 # find highest y point of B pt_b_ymax
 pt_b_ymax = max(b_poly_untranslated.exterior.coords, key=lambda p: p[1])
@@ -75,7 +76,7 @@ for pair in touching_pairs:
         case 2:
             potential_translation_vectors.append(helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_a.coords[1]))
         case 3:
-            translation = helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_a.coords[1])
+            translation = helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_b.coords[1])
             potential_translation_vectors.append((-translation[0], -translation[1]))
         case _:
             raise Exception("Invalid edge case")
@@ -102,12 +103,27 @@ for translation_vector in potential_translation_vectors:
 
 print(feasible_translation_vectors)
 
+if len(feasible_translation_vectors) > 1:
+    # choose "the edge that is nearest (in edge order) to the previous move"
+    raise NotImplementedError("Multiple possible translation vectors are not supported yet")
+else:
+    untrimmed_translation = feasible_translation_vectors[0]
 
 # 2d) trim feasible translation
+# for all points of B, apply the translation and see if (and where) it intersects
+# for all points of A, apply the translation "backwards" and see if (and where) it intersects
+# trim translation vector as you go
+# TODO this can be used to eliminate intersection tests
+
+trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, pt_a_ymin)
+trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, pt_a_ymin, reverse=True)
+print("trimmed translation vector: ", trimmed_translation_vector)
+
 # 2e) apply feasible translation
+b_poly = translate(b_poly_untranslated, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
+nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
 
-
-
+print(nfp)
 
 # TODO allow for arbitrary reference point on B
 # - for which we need to ensure that it doesn't intersect with A (so choose correct vertex of A)

@@ -112,6 +112,40 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
             return bool(translation_vector_angle <= 180)
 
 
+def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertex: tuple, reverse: bool = False) -> tuple:
+    dx, dy = translation_vector
+    if reverse:
+        dx, dy = -dx, -dy
+
+    for x, y in source_poly.exterior.coords[:-1]:
+        start = (x, y)
+        if start == shared_vertex:  # would intersect immediately
+            continue
+
+        end = (x + dx, y + dy)
+        path = LineString([start, end])
+        intersection = path.intersection(target_poly)
+
+        if not intersection.is_empty:
+            if intersection.geom_type == "Point":
+                intersection_point = intersection
+            elif intersection.geom_type.startswith("Multi"):
+                intersection_point = list(intersection.geoms)[0]
+            else:
+                continue
+
+            # Set vector to go only up to the intersection point
+            ix, iy = intersection_point.coords[0]
+            trimmed_vector = (ix - x, iy - y)
+            # If reverse, flip vector back to match original direction
+            if reverse:
+                trimmed_vector = (-trimmed_vector[0], -trimmed_vector[1])
+
+            return trimmed_vector
+
+    return translation_vector
+
+
 # ----- more general helpers -----
 
 def vector_from_points(start: tuple, end: tuple) -> tuple:
