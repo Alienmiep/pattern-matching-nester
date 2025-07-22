@@ -6,7 +6,9 @@ from shapely.geometry import Polygon, Point, LineString
 @dataclass
 class EdgePair:
     edge_a: LineString
+    edge_a_index: int
     edge_b: LineString
+    edge_b_index: int
     shared_vertex: Point
     edge_case: int
 
@@ -40,7 +42,7 @@ def classify_edge_pair(edge_pair: tuple) -> int:
     return 0
 
 
-def translation_vector_from_edge_pair(pair: EdgePair) -> tuple | None:
+def translation_vector_from_edge_pair(pair: EdgePair) -> tuple:
     # 1. find out whether the touching vertex is start of end of a/b
     edge_a_part = "start" if Point(pair.edge_a.coords[0]) == pair.shared_vertex else "end"
     edge_b_part = "start" if Point(pair.edge_b.coords[0]) == pair.shared_vertex else "end"
@@ -51,11 +53,11 @@ def translation_vector_from_edge_pair(pair: EdgePair) -> tuple | None:
     # 3. get case and return translation vector (or None, that's fine too)
     match(get_edge_case(edge_a_part, edge_b_part, relative_position)):
         case 1 | 6 | 8:
-            return vector_from_points(pair.edge_b.coords[1], pair.edge_b.coords[0])  # reverse direction here
+            return vector_from_points(pair.edge_b.coords[1], pair.edge_b.coords[0]), ("b", pair.edge_b_index)  # reverse direction here
         case 2 | 4:
-            return vector_from_points(pair.edge_a.coords[0], pair.edge_a.coords[1])
+            return vector_from_points(pair.edge_a.coords[0], pair.edge_a.coords[1]), ("a", pair.edge_a_index)
         case 3 | 5 | 7:
-            return None
+            return None, None
         case _:
             raise Exception("Edge pair case could not be resolved")
 
@@ -93,6 +95,7 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> 
             return key
     return 0
 
+
 def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
     point_b = (pair.shared_vertex.x, pair.shared_vertex.y)  # ended up being the same for all cases
@@ -103,6 +106,13 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
             feasible_range = angle_from_points(point_a, point_b, point_c) + 180
 
             translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, point_c)
+
+            print(point_a, point_b, point_c)
+            print(feasible_range)
+            print(translation_vector_endpoint)
+            print(translation_vector_angle)
+            print(is_left_or_right(pair.edge_a, LineString([point_b, translation_vector_endpoint])))
+            print(is_left_or_right(pair.edge_b, LineString([point_b, translation_vector_endpoint])))
             return bool(translation_vector_angle <= feasible_range)
         case 2:
             translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, pair.edge_a.coords[1])
@@ -146,6 +156,13 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
     return translation_vector
 
 
+def is_closed_loop(nfp, tol=1e-8):
+    if len(nfp) < 3:
+        return False
+    start = Point(nfp[0])
+    end = Point(nfp[-1])
+    return start.distance(end) < tol
+
 # ----- more general helpers -----
 
 def vector_from_points(start: tuple, end: tuple) -> tuple:
@@ -169,3 +186,16 @@ def angle_from_points(point_a: tuple, point_b: tuple, point_c: tuple) -> float:
         angle_deg += 360
 
     return angle_deg
+
+
+def get_edges(polygon):
+    coords = list(polygon.exterior.coords)
+    edges = [LineString([coords[i], coords[i+1]]) for i in range(len(coords)-1)]
+    return edges
+
+
+def find_edge_index(poly_edges: list, edge: LineString) -> int:
+    for i, e in enumerate(poly_edges):
+        if e.equals(edge):
+            return i
+    raise Exception("Cannot find specified edge in polygon")
