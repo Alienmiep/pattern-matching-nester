@@ -96,30 +96,39 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> 
     return 0
 
 
+def get_disallowed_location(a_part: str, b_part: str) -> tuple:
+    # page 37, Fig. 10
+    location_a = "left" if a_part == "start" else "right"
+    location_b = "left" if b_part == "start" else "right"
+    return location_a, location_b
+
+
 def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
-    point_b = (pair.shared_vertex.x, pair.shared_vertex.y)  # ended up being the same for all cases
+    translation_vector_linestring = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), translation_vector_endpoint])
+
     match pair.edge_case:
         case 1:
-            point_a = pair.edge_b.coords[0] if pair.edge_b.coords[0] not in list(pair.edge_a.coords) else pair.edge_b.coords[1]  # non-touching point on edge_b
-            point_c = pair.edge_a.coords[0] if pair.edge_a.coords[0] not in list(pair.edge_b.coords) else pair.edge_a.coords[1]  # non-touching point on edge_a
-            feasible_range = angle_from_points(point_a, point_b, point_c) + 180
-
-            translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, point_c)
-
-            print(point_a, point_b, point_c)
-            print(feasible_range)
-            print(translation_vector_endpoint)
-            print(translation_vector_angle)
-            print(is_left_or_right(pair.edge_a, LineString([point_b, translation_vector_endpoint])))
-            print(is_left_or_right(pair.edge_b, LineString([point_b, translation_vector_endpoint])))
-            return bool(translation_vector_angle <= feasible_range)
+            # which part of a/b is touching the shared vertex
+            edge_a_part = "start" if Point(pair.edge_a.coords[0]) == pair.shared_vertex else "end"
+            edge_b_part = "start" if Point(pair.edge_b.coords[0]) == pair.shared_vertex else "end"
+            disallowed_a, disallowed_b = get_disallowed_location(edge_a_part, edge_b_part)
+            location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
+            location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
+            print(location_a, location_b)
+            print(disallowed_a, disallowed_b)
+            if location_a == "parallel":  # TODO <- questionable
+                location_a = disallowed_a
+            if location_b == "parallel":
+                location_b = disallowed_b
+            print(not (location_a == disallowed_a and location_b == disallowed_b))
+            return not (location_a == disallowed_a and location_b == disallowed_b)
         case 2:
-            translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, pair.edge_a.coords[1])
-            return bool(translation_vector_angle <= 180)
+            location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
+            return location_a == "right"
         case 3:
-            translation_vector_angle = angle_from_points(translation_vector_endpoint, point_b, pair.edge_b.coords[0])
-            return bool(translation_vector_angle <= 180)
+            location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
+            return location_b == "left"
 
 
 def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertex: tuple, reverse: bool = False) -> tuple:

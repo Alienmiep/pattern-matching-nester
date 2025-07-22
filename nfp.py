@@ -152,7 +152,7 @@ while not nfp_is_closed_loop:
     print(a_poly.touches(b_poly))
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 1:
+    if len(nfp) > 2:
         nfp_is_closed_loop = True
 
 
