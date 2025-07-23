@@ -111,8 +111,7 @@ while not nfp_is_closed_loop:
     for index, translation_vector in enumerate(potential_translation_vectors):
         is_feasible = True
         for pair in touching_pairs:
-            print("touching pair: ", pair)
-            is_feasible = is_feasible and helper.is_in_feasible_range(translation_vector, pair)
+            is_feasible = is_feasible and helper.is_in_feasible_range(translation_vector, pair)  # stops checking once an edge has been found not feasible
         if is_feasible:
             feasible_translation_vectors.append(translation_vector)
             feasible_translation_vectors_edges.append(potential_translation_vectors_edges[index])

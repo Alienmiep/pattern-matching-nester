@@ -73,7 +73,11 @@ def is_left_or_right(edge_a: LineString, edge_b: LineString) -> str:
     point_b = edge_a.coords[0]
     point_c = edge_a.coords[1]
     angle = angle_from_points(point_a, point_b, point_c)
-    return "left" if angle > 180 else "right"
+    if angle > 180:
+        return "left"
+    if angle == 180:
+        return "parallel"
+    return "right"
 
 
 def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> int:
@@ -96,33 +100,19 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> 
     return 0
 
 
-def get_disallowed_location(a_part: str, b_part: str) -> tuple:
-    # page 37, Fig. 10
-    location_a = "left" if a_part == "start" else "right"
-    location_b = "left" if b_part == "start" else "right"
-    return location_a, location_b
-
-
 def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
     translation_vector_linestring = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), translation_vector_endpoint])
 
     match pair.edge_case:
         case 1:
-            # which part of a/b is touching the shared vertex
-            edge_a_part = "start" if Point(pair.edge_a.coords[0]) == pair.shared_vertex else "end"
-            edge_b_part = "start" if Point(pair.edge_b.coords[0]) == pair.shared_vertex else "end"
-            disallowed_a, disallowed_b = get_disallowed_location(edge_a_part, edge_b_part)
+            # the allowed range is the side of a that b is on, union with the side of b that a is not on
+            # borders (="parallel") are allowed too
+            allowed_side_a = is_left_or_right(pair.edge_a, pair.edge_b)
+            allowed_side_b = "right" if is_left_or_right(pair.edge_b, pair.edge_a) == "left" else "left"
             location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
             location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
-            print(location_a, location_b)
-            print(disallowed_a, disallowed_b)
-            if location_a == "parallel":  # TODO <- questionable
-                location_a = disallowed_a
-            if location_b == "parallel":
-                location_b = disallowed_b
-            print(not (location_a == disallowed_a and location_b == disallowed_b))
-            return not (location_a == disallowed_a and location_b == disallowed_b)
+            return location_a in [allowed_side_a, "parallel"] or location_b in [allowed_side_b, "parallel"]
         case 2:
             location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
             return location_a == "right"
