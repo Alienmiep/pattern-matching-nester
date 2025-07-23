@@ -5,7 +5,8 @@ from shapely.affinity import translate
 import matplotlib.pyplot as plt
 
 import helper
-from helper import EdgePair
+from helper import EdgePair, INTERSECTION_PRECISION
+
 
 a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 a_poly_edges = helper.get_edges(a_poly)
@@ -34,7 +35,8 @@ if not a_poly.touches(b_poly):
 
 nfp_is_closed_loop = False
 while not nfp_is_closed_loop:
-    shared_point = a_poly.intersection(b_poly)
+    shared_point = a_poly.intersection(b_poly, INTERSECTION_PRECISION)
+    # TODO multipoint time :)
 
     if shared_point.geom_type in ('Polygon', 'MultiPolygon'):
         raise Exception("Polygons seem to overlap")
@@ -148,10 +150,9 @@ while not nfp_is_closed_loop:
     nfp_edges.append(untrimmed_translation_edge)
 
     print("NFP: ", nfp)
-    print(a_poly.touches(b_poly))
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 4:
+    if len(nfp) > 5:
         nfp_is_closed_loop = True
 
 

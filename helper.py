@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import nearest_points
 
+INTERSECTION_PRECISION = 0.01
+NO_OF_ROUNDING_DIGITS = 2
+
 @dataclass
 class EdgePair:
     edge_a: LineString
@@ -33,7 +36,7 @@ def classify_edge_pair(edge_pair: tuple) -> int:
     if shared_points:
         return 1
 
-    inter = edge_pair[0].intersection(edge_pair[1])
+    inter = edge_pair[0].intersection(edge_pair[1], INTERSECTION_PRECISION)
     if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
         return 2
 
@@ -137,7 +140,7 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
             continue
 
         path = LineString([start, end])
-        intersection = path.intersection(target_poly)
+        intersection = path.intersection(target_poly, INTERSECTION_PRECISION)
 
         if not intersection.is_empty:
             if intersection.geom_type == "Point":
@@ -152,8 +155,8 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
 
             # Set vector to go only up to the intersection point
             ix, iy = intersection_point
-            dx = ix - start[0]
-            dy = iy - start[1]
+            dx = round(ix - start[0], NO_OF_ROUNDING_DIGITS)
+            dy = round(iy - start[1], NO_OF_ROUNDING_DIGITS)
     # If reverse, flip vector back to match original direction
     if reverse:
         return (-dx, -dy)
