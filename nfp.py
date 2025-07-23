@@ -9,7 +9,7 @@ from helper import EdgePair
 
 a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 a_poly_edges = helper.get_edges(a_poly)
-b_poly_untranslated = Polygon([(14, 6), (20, 6), (22, 12), (16, 10)])  # orbiting
+b_poly_untranslated = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
 # TODO potentially a problem, because GarmentCode parts are defined clockwise
 
 # 1. setup
@@ -151,7 +151,7 @@ while not nfp_is_closed_loop:
     print(a_poly.touches(b_poly))
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 2:
+    if len(nfp) > 4:
         nfp_is_closed_loop = True
 
 

@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 
 from shapely.geometry import Polygon, Point, LineString
+from shapely.ops import nearest_points
 
 @dataclass
 class EdgePair:
@@ -128,31 +129,67 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
 
     for x, y in source_poly.exterior.coords[:-1]:
         start = (x, y)
-        if start == shared_vertex:  # would intersect immediately
+        end = (x + dx, y + dy)
+
+        if end in source_poly.exterior.coords:
+            continue
+        if start in target_poly.exterior.coords and end in target_poly.exterior.coords:
             continue
 
-        end = (x + dx, y + dy)
         path = LineString([start, end])
         intersection = path.intersection(target_poly)
 
         if not intersection.is_empty:
             if intersection.geom_type == "Point":
-                intersection_point = intersection
-            elif intersection.geom_type.startswith("Multi"):
-                intersection_point = list(intersection.geoms)[0]
+                intersection_point = intersection.coords[0]
+                if intersection_point == shared_vertex:
+                    continue
+            elif intersection.geom_type == "LineString":
+                intersection_point = intersection.coords[0]
             else:
-                continue
+                # example: GEOMETRYCOLLECTION (LINESTRING (10.571428571428571 9.714285714285714, 11 10), POINT (8 8))
+                intersection_point = find_closest_intersection(start, intersection)
 
             # Set vector to go only up to the intersection point
-            ix, iy = intersection_point.coords[0]
-            trimmed_vector = (ix - x, iy - y)
-            # If reverse, flip vector back to match original direction
-            if reverse:
-                trimmed_vector = (-trimmed_vector[0], -trimmed_vector[1])
+            ix, iy = intersection_point
+            dx = ix - start[0]
+            dy = iy - start[1]
+    # If reverse, flip vector back to match original direction
+    if reverse:
+        return (-dx, -dy)
 
-            return trimmed_vector
+    return (dx, dy)
 
-    return translation_vector
+
+def find_closest_intersection(start: tuple, geometry_collection) -> Point | None:
+    start_point = Point(start)
+    closest_point = None
+    min_distance = float("inf")
+
+    geoms = (geometry_collection.geoms if hasattr(geometry_collection, "geoms") else [geometry_collection])
+
+    for geom in geoms:
+        if geom.is_empty:
+            continue
+
+        if isinstance(geom, Point):
+            if geom.equals(start_point):
+                continue  # skip exact start point
+            dist = start_point.distance(geom)
+            if dist < min_distance:
+                closest_point = geom
+                min_distance = dist
+
+        elif isinstance(geom, LineString):
+            p1, p2 = nearest_points(start_point, geom)
+            if p2.equals(start_point):
+                continue  # again, skip exact start
+            dist = start_point.distance(p2)
+            if dist < min_distance:
+                closest_point = p2
+                min_distance = dist
+
+    return (closest_point.x, closest_point.y)
 
 
 def is_closed_loop(nfp, tol=1e-8):
