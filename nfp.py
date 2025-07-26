@@ -35,10 +35,16 @@ if not a_poly.touches(b_poly):
 
 nfp_is_closed_loop = False
 while not nfp_is_closed_loop:
-    shared_point = a_poly.intersection(b_poly, INTERSECTION_PRECISION)
-    # TODO multipoint time :)
+    shared_points = []
+    intersection = helper.precision_aware_intersection(a_poly, b_poly)
+    if intersection.is_empty:
+        raise Exception("Polygons are not touching")
 
-    if shared_point.geom_type in ('Polygon', 'MultiPolygon'):
+    if intersection.geom_type == "Point":
+        shared_points = [intersection]
+    elif intersection.geom_type == "MultiPoint":
+        shared_points = list(intersection.geoms)
+    elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
         raise Exception("Polygons seem to overlap")
         # TODO see how this reacts to touching along an edge
 
@@ -49,10 +55,13 @@ while not nfp_is_closed_loop:
     # store these touching pairs, along with the position of the touching vertex
     # at the current step, this should leave us with 4 pairs, even in the case of identical edges
 
-    edges_poly_a = helper.incident_edges(a_poly, shared_point)
-    edges_poly_b = helper.incident_edges(b_poly, shared_point)
+    combinations = []
+    for shared_point in shared_points:
+        edges_poly_a = helper.incident_edges(a_poly, shared_point)
+        edges_poly_b = helper.incident_edges(b_poly, shared_point)
+        combinations.extend(list(product(edges_poly_a, edges_poly_b)))
 
-    combinations = list(product(edges_poly_a, edges_poly_b))
+    print("identified edge pair combinations: ", combinations)
 
     # these edge pairs can fall into three different cases:
     # (1) both touch in a vertex (like a V)
@@ -82,18 +91,18 @@ while not nfp_is_closed_loop:
         match pair.edge_case:
             case 1:
                 translation, edge = helper.translation_vector_from_edge_pair(pair)
-                if translation and translation not in potential_translation_vectors:
-                    potential_translation_vectors.append(translation)
-                    potential_translation_vectors_edges.append(edge)
             case 2:
-                potential_translation_vectors.append(helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_a.coords[1]))
-                potential_translation_vectors_edges.append(("a", pair.edge_a_index))
+                translation = helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_a.coords[1])
+                edge = ("a", pair.edge_a_index)
             case 3:
-                translation = helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_b.coords[1])
-                potential_translation_vectors.append((-translation[0], -translation[1]))
-                potential_translation_vectors_edges.append(("b", pair.edge_b_index))
+                translation_wrong_direction = helper.vector_from_points((pair.shared_vertex.x, pair.shared_vertex.y), pair.edge_b.coords[1])
+                translation = (-translation_wrong_direction[0], -translation_wrong_direction[1])
+                edge = ("b", pair.edge_b_index)
             case _:
                 raise Exception("Invalid edge case")
+        if translation and translation not in potential_translation_vectors:
+            potential_translation_vectors.append(translation)
+            potential_translation_vectors_edges.append(edge)
 
     print("potential translation vectors: ", potential_translation_vectors)
     print("edges uses to generate them: ", potential_translation_vectors_edges)

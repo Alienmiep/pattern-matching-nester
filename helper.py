@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 
+from shapely import set_precision
 from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import nearest_points
 
@@ -22,7 +23,7 @@ def incident_edges(polygon: Polygon, point: Point) -> list:
     edges = []
     for i in range(len(coords) - 1):  # skip closing segment
         edge = LineString([coords[i], coords[i + 1]])
-        if edge.touches(point):  # this should work for edge cases (2) and (3) as well
+        if edge.distance(point) <= INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
             edges.append(edge)
     return edges
 
@@ -36,7 +37,7 @@ def classify_edge_pair(edge_pair: tuple) -> int:
     if shared_points:
         return 1
 
-    inter = edge_pair[0].intersection(edge_pair[1], INTERSECTION_PRECISION)
+    inter = precision_aware_intersection(edge_pair[0], edge_pair[1])
     if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
         return 2
 
@@ -140,7 +141,7 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
             continue
 
         path = LineString([start, end])
-        intersection = path.intersection(target_poly, INTERSECTION_PRECISION)
+        intersection = precision_aware_intersection(path, target_poly)
 
         if not intersection.is_empty:
             if intersection.geom_type == "Point":
@@ -204,10 +205,16 @@ def is_closed_loop(nfp, tol=1e-8):
 
 # ----- more general helpers -----
 
+def precision_aware_intersection(obj1, obj2, precision=INTERSECTION_PRECISION):
+    obj1_snapped = set_precision(obj1, precision)
+    obj2_snapped = set_precision(obj2, precision)
+    return obj1_snapped.intersection(obj2_snapped)
+
+
 def vector_from_points(start: tuple, end: tuple) -> tuple:
     dx = end[0] - start[0]
     dy = end[1] - start[1]
-    return (dx, dy)
+    return (round(dx, NO_OF_ROUNDING_DIGITS), round(dy, NO_OF_ROUNDING_DIGITS))
 
 
 def angle_from_points(point_a: tuple, point_b: tuple, point_c: tuple) -> float:
