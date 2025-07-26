@@ -132,7 +132,7 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
             return location_b != disallowed_side_b
 
 
-def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertex: tuple, reverse: bool = False) -> tuple:
+def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertices: list, reverse: bool = False) -> tuple:
     dx, dy = translation_vector
     if reverse:
         dx, dy = -dx, -dy
@@ -152,10 +152,11 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
         if not intersection.is_empty:
             if intersection.geom_type == "Point":
                 intersection_point = intersection.coords[0]
-                if intersection_point == shared_vertex:
+                if intersection in shared_vertices:
                     continue
-            elif intersection.geom_type == "LineString":
-                intersection_point = intersection.coords[0]
+            elif intersection.geom_type == "LineString":  # can happen in edge cases 2 and 3
+                print("Skipped due to LineString intersection")
+                continue
             else:
                 # example: GEOMETRYCOLLECTION (LINESTRING (10.571428571428571 9.714285714285714, 11 10), POINT (8 8))
                 intersection_point = find_closest_intersection(start, intersection)

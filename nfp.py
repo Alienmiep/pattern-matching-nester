@@ -5,8 +5,7 @@ from shapely.affinity import translate
 import matplotlib.pyplot as plt
 
 import helper
-from helper import EdgePair, INTERSECTION_PRECISION
-
+from helper import EdgePair
 
 a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 a_poly_edges = helper.get_edges(a_poly)
@@ -102,10 +101,10 @@ while not nfp_is_closed_loop:
                 raise Exception("Invalid edge case")
         if translation and translation not in potential_translation_vectors:
             potential_translation_vectors.append(translation)
-            potential_translation_vectors_edges.append((edge, pair.shared_vertex))
+            potential_translation_vectors_edges.append(edge)
 
     print("potential translation vectors: ", potential_translation_vectors)
-    print("edges and shared points uses to generate them: ", potential_translation_vectors_edges)
+    print("edges used to generate them: ", potential_translation_vectors_edges)
 
 
     # 2c) find feasible translation
@@ -128,7 +127,7 @@ while not nfp_is_closed_loop:
             feasible_translation_vectors_edges.append(potential_translation_vectors_edges[index])
 
     print("feasible translation vectors: ", feasible_translation_vectors)
-    print("edges and shared points uses to generate them: ", feasible_translation_vectors_edges)
+    print("edges used to generate them: ", feasible_translation_vectors_edges)
     print("NFP edges so far:", nfp_edges)
 
     if len(feasible_translation_vectors) > 1:
@@ -140,7 +139,7 @@ while not nfp_is_closed_loop:
         untrimmed_translation_edge = feasible_translation_vectors_edges[0]
 
     print("decided on translation vector: ", untrimmed_translation)
-    print("made from edge+shared point: ", untrimmed_translation_edge)
+    print("made from edge: ", untrimmed_translation_edge)
 
     # 2d) trim feasible translation
     # for all points of B, apply the translation and see if (and where) it intersects
@@ -148,21 +147,20 @@ while not nfp_is_closed_loop:
     # trim translation vector as you go
     # TODO this can be used to eliminate intersection tests
 
-    shared_point = untrimmed_translation_edge[1]
-    trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, (shared_point.x, shared_point.y))
-    trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, (shared_point.x, shared_point.y), reverse=True)
+    trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points)
+    trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, reverse=True)
     print("trimmed translation vector: ", trimmed_translation_vector)
 
     # 2e) apply feasible translation
     b_poly = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
     b_poly_edges = helper.get_edges(b_poly)
     nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
-    nfp_edges.append(untrimmed_translation_edge[0])
+    nfp_edges.append(untrimmed_translation_edge)
 
     print("NFP: ", nfp)
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 5:
+    if len(nfp) > 100:  # safety mechanism
         nfp_is_closed_loop = True
 
 
