@@ -55,11 +55,11 @@ while not nfp_is_closed_loop:
     # store these touching pairs, along with the position of the touching vertex
     # at the current step, this should leave us with 4 pairs, even in the case of identical edges
 
-    combinations = []
+    combinations = {}
     for shared_point in shared_points:
         edges_poly_a = helper.incident_edges(a_poly, shared_point)
         edges_poly_b = helper.incident_edges(b_poly, shared_point)
-        combinations.extend(list(product(edges_poly_a, edges_poly_b)))
+        combinations[shared_point] = list(product(edges_poly_a, edges_poly_b))
 
     print("identified edge pair combinations: ", combinations)
 
@@ -69,12 +69,12 @@ while not nfp_is_closed_loop:
     # (3) stationary edge touches the middle of orbiting edge (also like a T)
 
     touching_pairs = []
-    for edge_pair in combinations:
-        edge_case = helper.classify_edge_pair(edge_pair)
-        edge_a_index = helper.find_edge_index(a_poly_edges, edge_pair[0])
-        edge_b_index = helper.find_edge_index(b_poly_edges, edge_pair[1])
-        touching_pairs.append(EdgePair(edge_pair[0], edge_a_index, edge_pair[1], edge_b_index, shared_point, edge_case))
-
+    for shared_point, edge_pair_list in combinations.items():
+        for edge_pair in edge_pair_list:
+            edge_case = helper.classify_edge_pair(edge_pair)
+            edge_a_index = helper.find_edge_index(a_poly_edges, edge_pair[0])
+            edge_b_index = helper.find_edge_index(b_poly_edges, edge_pair[1])
+            touching_pairs.append(EdgePair(edge_pair[0], edge_a_index, edge_pair[1], edge_b_index, shared_point, edge_case))
 
     # 2b) create potential translation vectors
     # create translation vectors from these pairs
@@ -102,10 +102,10 @@ while not nfp_is_closed_loop:
                 raise Exception("Invalid edge case")
         if translation and translation not in potential_translation_vectors:
             potential_translation_vectors.append(translation)
-            potential_translation_vectors_edges.append(edge)
+            potential_translation_vectors_edges.append((edge, pair.shared_vertex))
 
     print("potential translation vectors: ", potential_translation_vectors)
-    print("edges uses to generate them: ", potential_translation_vectors_edges)
+    print("edges and shared points uses to generate them: ", potential_translation_vectors_edges)
 
 
     # 2c) find feasible translation
@@ -128,7 +128,7 @@ while not nfp_is_closed_loop:
             feasible_translation_vectors_edges.append(potential_translation_vectors_edges[index])
 
     print("feasible translation vectors: ", feasible_translation_vectors)
-    print("edges uses to generate them: ", feasible_translation_vectors_edges)
+    print("edges and shared points uses to generate them: ", feasible_translation_vectors_edges)
     print("NFP edges so far:", nfp_edges)
 
     if len(feasible_translation_vectors) > 1:
@@ -140,7 +140,7 @@ while not nfp_is_closed_loop:
         untrimmed_translation_edge = feasible_translation_vectors_edges[0]
 
     print("decided on translation vector: ", untrimmed_translation)
-    print("made from edge: ", untrimmed_translation_edge)
+    print("made from edge+shared point: ", untrimmed_translation_edge)
 
     # 2d) trim feasible translation
     # for all points of B, apply the translation and see if (and where) it intersects
@@ -148,6 +148,7 @@ while not nfp_is_closed_loop:
     # trim translation vector as you go
     # TODO this can be used to eliminate intersection tests
 
+    shared_point = untrimmed_translation_edge[1]
     trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, (shared_point.x, shared_point.y))
     trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, (shared_point.x, shared_point.y), reverse=True)
     print("trimmed translation vector: ", trimmed_translation_vector)
@@ -156,7 +157,7 @@ while not nfp_is_closed_loop:
     b_poly = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
     b_poly_edges = helper.get_edges(b_poly)
     nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
-    nfp_edges.append(untrimmed_translation_edge)
+    nfp_edges.append(untrimmed_translation_edge[0])
 
     print("NFP: ", nfp)
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
