@@ -80,7 +80,7 @@ def is_left_or_right(edge_a: LineString, edge_b: LineString) -> str:
     angle = angle_from_points(point_a, point_b, point_c)
     if angle > 180:
         return "left"
-    if angle == 180:
+    if angle == 180 or (angle <= 0.5 and angle >= -0.5):  # lowering coordinate precision can mess with the angles of parallel lines
         return "parallel"
     return "right"
 
@@ -119,11 +119,17 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
             location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
             return location_a in [allowed_side_a, "parallel"] or location_b in [allowed_side_b, "parallel"]
         case 2:
-            location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
-            return location_a == "right"
+            # side of a that b is on, but only use the part of a betweeen shared_vertex and its end
+            trimmed_a = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), (pair.edge_a.coords[1])])
+            allowed_side_a = is_left_or_right(trimmed_a, pair.edge_b)
+            location_a = is_left_or_right(trimmed_a, translation_vector_linestring)
+            return location_a in [allowed_side_a, "parallel"]
         case 3:
-            location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
-            return location_b == "left"
+            # side of b that a is not on, but only use the part of b betweeen shared_vertex and its end
+            trimmed_b = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), (pair.edge_b.coords[1])])
+            disallowed_side_b = is_left_or_right(trimmed_b, pair.edge_a)
+            location_b = is_left_or_right(trimmed_b, translation_vector_linestring)
+            return location_b != disallowed_side_b
 
 
 def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertex: tuple, reverse: bool = False) -> tuple:
