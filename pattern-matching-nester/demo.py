@@ -13,6 +13,7 @@ from shapely.geometry import box
 from models.piece import Piece
 from svg_helper import *
 from ifp import ifp
+from nfp import nfp
 
 # "pattern profile"
 SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
@@ -332,10 +333,10 @@ class PolygonViewer(QMainWindow):
 
         result = main_polygon
         for index, poly in enumerate(polygons_to_subtract):
-            nfp = simple_nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
-            self.shapes[f"nfp_{index}"] = list(nfp.exterior.coords)
+            nfp_poly = nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
+            self.shapes[f"nfp_{index}"] = list(nfp_poly.exterior.coords)
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
-            result = result.difference(nfp)
+            result = result.difference(nfp_poly)
 
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(result)

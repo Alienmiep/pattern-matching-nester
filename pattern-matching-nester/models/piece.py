@@ -44,7 +44,7 @@ class Piece():
                 if (x, y) not in vertices:
                     vertices.append((x, y))  # avoid duplicate points
 
-        return vertices
+        return vertices[::-1]  # reverse order of vertices
 
     def area(self):
         polygon = Polygon(self.vertices)
