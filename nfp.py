@@ -1,15 +1,17 @@
 from itertools import product
 
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 from shapely.affinity import translate
 import matplotlib.pyplot as plt
 
-import helper
+import helper as helper
 from helper import EdgePair
 
-a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
+# a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
+a_poly = Polygon([(73, 0), (73, 58.500000000000014), (0, 58.500000000000014), (0, 0), (73, 0)])
 a_poly_edges = helper.get_edges(a_poly)
-b_poly_untranslated = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
+# b_poly_untranslated = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
+b_poly_untranslated = Polygon([(108.8, 111.0), (108.8, 169.5), (61.5, 169.5), (61.5, 111.0)])
 # TODO potentially a problem, because GarmentCode parts are defined clockwise
 
 # 1. setup
@@ -43,6 +45,8 @@ while not nfp_is_closed_loop:
         shared_points = [intersection]
     elif intersection.geom_type == "MultiPoint":
         shared_points = list(intersection.geoms)
+    elif intersection.geom_type == "LineString":
+        shared_points = [Point(coord) for coord in intersection.coords]
     elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
         raise Exception("Polygons seem to overlap")
         # TODO see how this reacts to touching along an edge
@@ -70,7 +74,7 @@ while not nfp_is_closed_loop:
     touching_pairs = []
     for shared_point, edge_pair_list in combinations.items():
         for edge_pair in edge_pair_list:
-            edge_case = helper.classify_edge_pair(edge_pair)
+            edge_case = helper.classify_edge_pair(edge_pair, shared_point)
             edge_a_index = helper.find_edge_index(a_poly_edges, edge_pair[0])
             edge_b_index = helper.find_edge_index(b_poly_edges, edge_pair[1])
             touching_pairs.append(EdgePair(edge_pair[0], edge_a_index, edge_pair[1], edge_b_index, shared_point, edge_case))

@@ -28,14 +28,25 @@ def incident_edges(polygon: Polygon, point: Point) -> list:
     return edges
 
 
-def classify_edge_pair(edge_pair: tuple) -> int:
-    endpoints_a = {edge_pair[0].coords[0], edge_pair[0].coords[-1]}
-    endpoints_b = {edge_pair[1].coords[0], edge_pair[1].coords[-1]}
+def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
+    precise_edge_a = set_precision(edge_pair[0], INTERSECTION_PRECISION)
+    precise_edge_b = set_precision(edge_pair[1], INTERSECTION_PRECISION)
+    endpoints_a = {precise_edge_a.coords[0], precise_edge_a.coords[-1]}
+    endpoints_b = {precise_edge_b.coords[0], precise_edge_b.coords[-1]}
 
     # check if they share an endpoint (case (1))
-    shared_points = endpoints_a & endpoints_b
-    if shared_points:
+    common_endpoint = endpoints_a & endpoints_b
+    if common_endpoint:
+        if len(common_endpoint) == 2:
+            return 1
+
+        endpoint = common_endpoint.pop()
+        if endpoint == shared_point.coords[0]:
         return 1
+
+        # but! if the non-shared endpoint of one edge touches the middle of the other edge, the case actually depends on the shared_point we're looking at
+        print("handling more complex case")
+        return 2 if endpoint in endpoints_b else 3
 
     inter = precision_aware_intersection(edge_pair[0], edge_pair[1])
     if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
