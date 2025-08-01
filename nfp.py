@@ -103,7 +103,7 @@ while not nfp_is_closed_loop:
                 edge = ("b", pair.edge_b_index)
             case _:
                 raise Exception("Invalid edge case")
-        if translation and translation not in potential_translation_vectors:
+        if translation and translation not in potential_translation_vectors and translation != (0, 0):
             potential_translation_vectors.append(translation)
             potential_translation_vectors_edges.append(edge)
 
@@ -164,7 +164,7 @@ while not nfp_is_closed_loop:
     print("NFP: ", nfp)
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 100:  # safety mechanism
+    if len(nfp) > 3:  # safety mechanism
         nfp_is_closed_loop = True
 
 

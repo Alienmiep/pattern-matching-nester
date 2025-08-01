@@ -42,7 +42,7 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
 
         endpoint = common_endpoint.pop()
         if endpoint == shared_point.coords[0]:
-        return 1
+            return 1
 
         # but! if the non-shared endpoint of one edge touches the middle of the other edge, the case actually depends on the shared_point we're looking at
         print("handling more complex case")
@@ -78,7 +78,9 @@ def translation_vector_from_edge_pair(pair: EdgePair) -> tuple:
             raise Exception("Edge pair case could not be resolved")
 
 
-def is_left_or_right(edge_a: LineString, edge_b: LineString) -> str:
+def is_left_or_right(edge_a_imprecise: LineString, edge_b_imprecise: LineString) -> str:
+    edge_a = set_precision(edge_a_imprecise, INTERSECTION_PRECISION)
+    edge_b = set_precision(edge_b_imprecise, INTERSECTION_PRECISION)
     if list(edge_a.coords) == list(edge_b.coords) or list(edge_a.coords) == list(edge_b.coords)[::-1]:
         return "parallel"
 
@@ -91,13 +93,13 @@ def is_left_or_right(edge_a: LineString, edge_b: LineString) -> str:
     angle = angle_from_points(point_a, point_b, point_c)
     if angle > 180:
         return "left"
-    if angle == 180 or (angle <= 0.5 and angle >= -0.5):  # lowering coordinate precision can mess with the angles of parallel lines
+    if angle == 180 or (angle <= 0.5 and angle >= -0.5):
         return "parallel"
     return "right"
 
 
-def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> int:
-    if relative_posiion == "parallel":
+def get_edge_case(edge_a_part: str, edge_b_part: str, relative_position: str) -> int:
+    if relative_position == "parallel":
         return 8
     elif edge_a_part == "end" and edge_b_part == "end":
         return 7
@@ -111,34 +113,62 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_posiion: str) -> 
         6: ["end", "start", "right"],
     }
     for key, value in case_table.items():
-        if value == [edge_a_part, edge_b_part, relative_posiion]:
+        if value == [edge_a_part, edge_b_part, relative_position]:
             return key
     return 0
 
 
 def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
+    shared_vertex = (pair.shared_vertex.x, pair.shared_vertex.y)
     translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
-    translation_vector_linestring = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), translation_vector_endpoint])
+    translation_vector_linestring = LineString([shared_vertex, translation_vector_endpoint])
+    print(pair)
 
     match pair.edge_case:
         case 1:
             # the allowed range is the side of a that b is on, union with the side of b that a is not on
             # borders (="parallel") are allowed too
+            if pair.edge_a_index == 3:
+                pass
             allowed_side_a = is_left_or_right(pair.edge_a, pair.edge_b)
-            allowed_side_b = "right" if is_left_or_right(pair.edge_b, pair.edge_a) == "left" else "left"
+            allowed_side_b = is_left_or_right(pair.edge_b, pair.edge_a)
             location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
             location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
-            return location_a in [allowed_side_a, "parallel"] or location_b in [allowed_side_b, "parallel"]
+            if allowed_side_a == "parallel" and allowed_side_b == "parallel":
+                return True
+
+            if location_a == "parallel":  # TODO this check is important, but it has false positives. Get into "start" and "end" again?
+                non_touching_vertex_of_a = pair.edge_a.coords[0] if pair.edge_a.coords[1] == shared_vertex else pair.edge_a.coords[1]
+                angle_a = angle_from_points(non_touching_vertex_of_a, shared_vertex, translation_vector_endpoint)
+                # compute fresh angle and check that for 180°
+                if angle_a == 180:
+                    return False
+
+            if location_b == "parallel":
+                # same here, points should be non-touching vertex of b, shared_point, translation_vector_endpoint
+                non_touching_vertex_of_b = pair.edge_b.coords[0] if pair.edge_b.coords[1] == shared_vertex else pair.edge_b.coords[1]
+                angle_b = angle_from_points(non_touching_vertex_of_b, shared_vertex, translation_vector_endpoint)
+                if angle_b == 0:
+                    return False
+
+            negated_side_b = "right" if allowed_side_b == "left" else "left"
+            return location_a in [allowed_side_a, "parallel"] or location_b in [negated_side_b, "parallel"]
         case 2:
             # side of a that b is on, but only use the part of a betweeen shared_vertex and its end
-            trimmed_a = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), (pair.edge_a.coords[1])])
+            trimmed_a = LineString([shared_vertex, (pair.edge_a.coords[1])])
             allowed_side_a = is_left_or_right(trimmed_a, pair.edge_b)
+            if allowed_side_a == "parallel":  # in cases 2 and 3 that means the two edges are laying on top of each other
+                return True
+
             location_a = is_left_or_right(trimmed_a, translation_vector_linestring)
             return location_a in [allowed_side_a, "parallel"]
         case 3:
             # side of b that a is not on, but only use the part of b betweeen shared_vertex and its end
-            trimmed_b = LineString([(pair.shared_vertex.x, pair.shared_vertex.y), (pair.edge_b.coords[1])])
+            trimmed_b = LineString([shared_vertex, (pair.edge_b.coords[1])])
             disallowed_side_b = is_left_or_right(trimmed_b, pair.edge_a)
+            if disallowed_side_b == "parallel":
+                return True
+
             location_b = is_left_or_right(trimmed_b, translation_vector_linestring)
             return location_b != disallowed_side_b
 
