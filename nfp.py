@@ -1,11 +1,12 @@
 from itertools import product
 
+from shapely import set_precision
 from shapely.geometry import Polygon, Point
 from shapely.affinity import translate
 import matplotlib.pyplot as plt
 
 import helper as helper
-from helper import EdgePair
+from helper import EdgePair, INTERSECTION_PRECISION
 
 # a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 a_poly = Polygon([(73, 0), (73, 58.500000000000014), (0, 58.500000000000014), (0, 0), (73, 0)])
@@ -185,6 +186,8 @@ while not nfp_is_closed_loop:
     print("trimmed translation vector: ", trimmed_translation_vector)
 
     # 2e) apply feasible translation
+    # b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
+    # b_poly = set_precision(b_poly_imprecise, INTERSECTION_PRECISION)  # TODO precision
     b_poly = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
     b_poly_edges = helper.get_edges(b_poly)
     nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
@@ -193,7 +196,7 @@ while not nfp_is_closed_loop:
     print("NFP: ", nfp)
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 5:  # safety mechanism
+    if len(nfp) > 100:  # safety mechanism
         nfp_is_closed_loop = True
 
 

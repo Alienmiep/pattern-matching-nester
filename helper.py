@@ -49,11 +49,15 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
         return 2 if endpoint in endpoints_b else 3
 
     inter = precision_aware_intersection(precise_edge_a, precise_edge_b)
-    if inter.geom_type in ["Point"] and tuple(inter.coords)[0] not in endpoints_a:
+    if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
         return 2
 
-    elif inter.geom_type in ["Point"] and tuple(inter.coords)[0] not in endpoints_b:
+    elif isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_b:
         return 3
+
+    elif isinstance(inter, LineString):
+        print("complex case, but with more overlap")
+        return 2 if (shared_point.x, shared_point.y) in endpoints_b else 3
 
     return 0
 
@@ -122,7 +126,6 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     shared_vertex = (pair.shared_vertex.x, pair.shared_vertex.y)
     translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
     translation_vector_linestring = LineString([shared_vertex, translation_vector_endpoint])
-    print(pair)
 
     match pair.edge_case:
         case 1:
