@@ -37,6 +37,7 @@ if not a_poly.touches(b_poly):
 nfp_is_closed_loop = False
 while not nfp_is_closed_loop:
     shared_points = []
+    line_intersection_flag = False
     intersection = helper.precision_aware_intersection(a_poly, b_poly)
     if intersection.is_empty:
         raise Exception("Polygons are not touching")
@@ -46,6 +47,7 @@ while not nfp_is_closed_loop:
     elif intersection.geom_type == "MultiPoint":
         shared_points = list(intersection.geoms)
     elif intersection.geom_type == "LineString":
+        line_intersection_flag = True
         shared_points = [Point(coord) for coord in intersection.coords]
     elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
         raise Exception("Polygons seem to overlap")
@@ -110,15 +112,15 @@ while not nfp_is_closed_loop:
     print("potential translation vectors: ", potential_translation_vectors)
     print("edges used to generate them: ", potential_translation_vectors_edges)
 
+    potential_translation_vectors , potential_translation_vectors_edges= helper.filter_redundant_vectors(potential_translation_vectors, potential_translation_vectors_edges)
+    print("potential translation vectors after filtering redundancies: ", potential_translation_vectors)
+    print("edges used to generate them: ", potential_translation_vectors_edges)
 
     # 2c) find feasible translation
     # choose a translation vector that doesn't immediately cause an intersection :)
     # consult touching edge pairs list to find it
     # each of these pairs defines an angular range within which a translation vector is allowed
     # and the candidate translation vector has to fit into all of them
-
-    # case (1) feasible range should be angle between the vectors + 180°
-    # cases (2) and (3) need the "correct" 180°
 
     feasible_translation_vectors = []
     feasible_translation_vectors_edges = []
@@ -135,9 +137,36 @@ while not nfp_is_closed_loop:
     print("NFP edges so far:", nfp_edges)
 
     if len(feasible_translation_vectors) > 1:
-        # choose "the edge that is nearest (in edge order) to the previous move"
-        # helper.decide_translation_vector(a_poly_edges, b_poly_edges, nfp_edges, feasible_translation_vectors, feasible_translation_vectors_edges)
-        raise NotImplementedError("Multiple possible translation vectors are not supported yet")
+        # when dealing with rectangular pieces, we might end up with a seemingly possible translation vector that can't be detected by the feasability check
+        actually_feasible_vectors = []
+        actually_feasible_vectors_edges = []
+        if not line_intersection_flag:
+            for index, candidate in enumerate(feasible_translation_vectors):
+                b_poly_candidate = translate(b_poly, xoff=candidate[0], yoff=candidate[1])
+                if not helper.precision_aware_intersection(a_poly, b_poly_candidate).is_empty:
+                    actually_feasible_vectors.append(candidate)
+                    actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+            if len(actually_feasible_vectors) > 1:
+                # choose "the edge that is nearest (in edge order) to the previous move"
+                # helper.decide_translation_vector(a_poly_edges, b_poly_edges, nfp_edges, feasible_translation_vectors, feasible_translation_vectors_edges)
+                raise NotImplementedError("Multiple possible translation vectors are not supported yet")
+            if not actually_feasible_vectors:
+                raise Exception("No feasible translation vectors left after intersection (or lack thereof) check")
+        else:
+            for index, candidate in enumerate(feasible_translation_vectors):
+                translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
+                angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
+                print(angle)
+                if angle != 90.0 and angle != 270.0:
+                    actually_feasible_vectors.append(candidate)
+                    actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+            print("actually feasible: ", actually_feasible_vectors)
+            if len(actually_feasible_vectors) > 1:
+                raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
+            if not actually_feasible_vectors:
+                raise Exception("No feasible translation vectors left after 90° check")
+        untrimmed_translation = actually_feasible_vectors[0]
+        untrimmed_translation_edge = actually_feasible_vectors_edges[0]
     else:
         untrimmed_translation = feasible_translation_vectors[0]
         untrimmed_translation_edge = feasible_translation_vectors_edges[0]
@@ -164,7 +193,7 @@ while not nfp_is_closed_loop:
     print("NFP: ", nfp)
     nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-    if len(nfp) > 3:  # safety mechanism
+    if len(nfp) > 5:  # safety mechanism
         nfp_is_closed_loop = True
 
 

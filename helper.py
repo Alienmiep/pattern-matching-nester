@@ -48,11 +48,11 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
         print("handling more complex case")
         return 2 if endpoint in endpoints_b else 3
 
-    inter = precision_aware_intersection(edge_pair[0], edge_pair[1])
-    if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
+    inter = precision_aware_intersection(precise_edge_a, precise_edge_b)
+    if inter.geom_type in ["Point"] and tuple(inter.coords)[0] not in endpoints_a:
         return 2
 
-    elif isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_b:
+    elif inter.geom_type in ["Point"] and tuple(inter.coords)[0] not in endpoints_b:
         return 3
 
     return 0
@@ -136,20 +136,6 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
             location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
             if allowed_side_a == "parallel" and allowed_side_b == "parallel":
                 return True
-
-            if location_a == "parallel":  # TODO this check is important, but it has false positives. Get into "start" and "end" again?
-                non_touching_vertex_of_a = pair.edge_a.coords[0] if pair.edge_a.coords[1] == shared_vertex else pair.edge_a.coords[1]
-                angle_a = angle_from_points(non_touching_vertex_of_a, shared_vertex, translation_vector_endpoint)
-                # compute fresh angle and check that for 180°
-                if angle_a == 180:
-                    return False
-
-            if location_b == "parallel":
-                # same here, points should be non-touching vertex of b, shared_point, translation_vector_endpoint
-                non_touching_vertex_of_b = pair.edge_b.coords[0] if pair.edge_b.coords[1] == shared_vertex else pair.edge_b.coords[1]
-                angle_b = angle_from_points(non_touching_vertex_of_b, shared_vertex, translation_vector_endpoint)
-                if angle_b == 0:
-                    return False
 
             negated_side_b = "right" if allowed_side_b == "left" else "left"
             return location_a in [allowed_side_a, "parallel"] or location_b in [negated_side_b, "parallel"]
@@ -250,6 +236,33 @@ def is_closed_loop(nfp, tol=1e-8):
     start = Point(nfp[0])
     end = Point(nfp[-1])
     return start.distance(end) < tol
+
+
+def normalize_vector(v: tuple, length: float) -> tuple:
+    dx, dy = v
+    if length == 0:
+        return (0.0, 0.0)
+    return (round(dx / length, 6), round(dy / length, 6))  # Rounded for stability
+
+
+def filter_redundant_vectors(vectors: list, vector_edges: list) -> tuple:
+    # Filters a list of vectors to remove shorter ones that point in the same direction.
+    direction_map = {}
+
+    for idx, v in enumerate(vectors):
+        length = math.hypot(v[0], v[1])
+        norm_dir = normalize_vector(v, length)
+
+        if norm_dir not in direction_map or length > direction_map[norm_dir][1]:
+            direction_map[norm_dir] = (v, length, vector_edges[idx])
+
+    filtered_vectors = []
+    filtered_edges = []
+    for vec, _, edge in direction_map.values():
+        filtered_vectors.append(vec)
+        filtered_edges.append(edge)
+
+    return filtered_vectors, filtered_edges
 
 # ----- more general helpers -----
 
