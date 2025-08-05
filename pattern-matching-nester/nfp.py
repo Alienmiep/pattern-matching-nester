@@ -1,11 +1,11 @@
 from itertools import product
 
-from shapely.geometry import Polygon
+from shapely import set_precision
+from shapely.geometry import Polygon, Point
 from shapely.affinity import translate
-import matplotlib.pyplot as plt
 
-import helper
-from helper import EdgePair
+import helper as helper
+from helper import EdgePair, INTERSECTION_PRECISION
 
 a_poly_local = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 b_poly_untranslated_local = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
@@ -35,8 +35,8 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
     nfp_is_closed_loop = False
     while not nfp_is_closed_loop:
         shared_points = []
+        line_intersection_flag = False
         intersection = helper.precision_aware_intersection(a_poly, b_poly)
-        print(intersection)
         if intersection.is_empty:
             raise Exception("Polygons are not touching")
 
@@ -44,9 +44,14 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
             shared_points = [intersection]
         elif intersection.geom_type == "MultiPoint":
             shared_points = list(intersection.geoms)
+        elif intersection.geom_type == "LineString":
+            line_intersection_flag = True
+            shared_points = [Point(coord) for coord in intersection.coords]
         elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
             raise Exception("Polygons seem to overlap")
             # TODO see how this reacts to touching along an edge
+        else:
+            raise Exception(f"Unhandled intersection type: {intersection.geom_type}")
 
         # 2. orbiting
         # 2a) detection of touching edges
@@ -71,7 +76,7 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
         touching_pairs = []
         for shared_point, edge_pair_list in combinations.items():
             for edge_pair in edge_pair_list:
-                edge_case = helper.classify_edge_pair(edge_pair)
+                edge_case = helper.classify_edge_pair(edge_pair, shared_point)
                 edge_a_index = helper.find_edge_index(a_poly_edges, edge_pair[0])
                 edge_b_index = helper.find_edge_index(b_poly_edges, edge_pair[1])
                 touching_pairs.append(EdgePair(edge_pair[0], edge_a_index, edge_pair[1], edge_b_index, shared_point, edge_case))
@@ -100,13 +105,16 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
                     edge = ("b", pair.edge_b_index)
                 case _:
                     raise Exception("Invalid edge case")
-            if translation and translation not in potential_translation_vectors:
+            if translation and translation not in potential_translation_vectors and translation != (0, 0):
                 potential_translation_vectors.append(translation)
                 potential_translation_vectors_edges.append(edge)
 
         print("potential translation vectors: ", potential_translation_vectors)
         print("edges used to generate them: ", potential_translation_vectors_edges)
 
+        potential_translation_vectors , potential_translation_vectors_edges= helper.filter_redundant_vectors(potential_translation_vectors, potential_translation_vectors_edges)
+        print("potential translation vectors after filtering redundancies: ", potential_translation_vectors)
+        print("edges used to generate them: ", potential_translation_vectors_edges)
 
         # 2c) find feasible translation
         # choose a translation vector that doesn't immediately cause an intersection :)
@@ -131,10 +139,40 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
         print("edges used to generate them: ", feasible_translation_vectors_edges)
         print("NFP edges so far:", nfp_edges)
 
+        if not feasible_translation_vectors:
+            raise Exception("NFP loop is still open, but no feasible translation vectors were found")
+
         if len(feasible_translation_vectors) > 1:
-            # choose "the edge that is nearest (in edge order) to the previous move"
-            # helper.decide_translation_vector(a_poly_edges, b_poly_edges, nfp_edges, feasible_translation_vectors, feasible_translation_vectors_edges)
-            raise NotImplementedError("Multiple possible translation vectors are not supported yet")
+            # when dealing with rectangular pieces, we might end up with a seemingly possible translation vector that can't be detected by the feasability check
+            actually_feasible_vectors = []
+            actually_feasible_vectors_edges = []
+            if not line_intersection_flag:
+                for index, candidate in enumerate(feasible_translation_vectors):
+                    b_poly_candidate = translate(b_poly, xoff=candidate[0], yoff=candidate[1])
+                    if not helper.precision_aware_intersection(a_poly, b_poly_candidate).is_empty:
+                        actually_feasible_vectors.append(candidate)
+                        actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+                if len(actually_feasible_vectors) > 1:
+                    # choose "the edge that is nearest (in edge order) to the previous move"
+                    # helper.decide_translation_vector(a_poly_edges, b_poly_edges, nfp_edges, feasible_translation_vectors, feasible_translation_vectors_edges)
+                    raise NotImplementedError("Multiple possible translation vectors are not supported yet")
+                if not actually_feasible_vectors:
+                    raise Exception("No feasible translation vectors left after intersection (or lack thereof) check")
+            else:
+                for index, candidate in enumerate(feasible_translation_vectors):
+                    translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
+                    angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
+                    print(angle)
+                    if angle != 90.0 and angle != 270.0:
+                        actually_feasible_vectors.append(candidate)
+                        actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+                print("actually feasible: ", actually_feasible_vectors)
+                if len(actually_feasible_vectors) > 1:
+                    raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
+                if not actually_feasible_vectors:
+                    raise Exception("No feasible translation vectors left after 90° check")
+            untrimmed_translation = actually_feasible_vectors[0]
+            untrimmed_translation_edge = actually_feasible_vectors_edges[0]
         else:
             untrimmed_translation = feasible_translation_vectors[0]
             untrimmed_translation_edge = feasible_translation_vectors_edges[0]
@@ -164,32 +202,9 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
         if len(nfp) > 100:  # safety mechanism
             nfp_is_closed_loop = True
 
-    return Polygon(nfp)
-
-# --- visualization! ---
-# def plot_polygon(ax, poly, color, label):
-#     x, y = poly.exterior.xy
-#     ax.fill(x, y, alpha=0.5, fc=color, ec='black', label=label)
-
-# # Set up the plot
-# fig, ax = plt.subplots()
-
-# # Plot polygons
-# plot_polygon(ax, a_poly, 'blue', 'A Polygon')
-# plot_polygon(ax, b_poly, 'green', 'B Polygon')
-
-# # Plot NFP points
-# nfp_x, nfp_y = zip(*nfp)
-# ax.plot(nfp_x, nfp_y, 'ro-', label='NFP Path')  # red points with lines
-
-# # Misc plot settings
-# ax.set_aspect('equal')
-# ax.legend()
-# ax.grid(True)
-# plt.title("Polygon NFP Visualization")
-# plt.xlabel("X")
-# plt.ylabel("Y")
-# plt.show()
+    unsnapped_nfp = Polygon(nfp)
+    snapped_nfp = set_precision(unsnapped_nfp, INTERSECTION_PRECISION)
+    return snapped_nfp
 
 
 # TODO allow for arbitrary reference point on B

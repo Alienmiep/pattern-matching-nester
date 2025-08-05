@@ -7,13 +7,14 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF
 
-from shapely import Polygon, LineString, MultiLineString
+from shapely import Polygon, LineString, MultiLineString, set_precision
 from shapely.geometry import box
 
 from models.piece import Piece
 from svg_helper import *
 from ifp import ifp
 from nfp import nfp
+from helper import INTERSECTION_PRECISION
 
 # "pattern profile"
 SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
@@ -333,10 +334,14 @@ class PolygonViewer(QMainWindow):
 
         result = main_polygon
         for index, poly in enumerate(polygons_to_subtract):
+            print(poly)
+            print(self.current_piece_vertices_calc)
             nfp_poly = nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
             self.shapes[f"nfp_{index}"] = list(nfp_poly.exterior.coords)
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
-            result = result.difference(nfp_poly)
+            result_imprecise = result.difference(nfp_poly)
+            result = set_precision(result_imprecise, INTERSECTION_PRECISION)
+            print(result)
 
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(result)
@@ -344,6 +349,7 @@ class PolygonViewer(QMainWindow):
                 (pt for line in self.fabric_texture for pt in line.coords),
                 key=lambda p: (p[0], p[1])
             )
+            print(target_point)
         else:  # just use IFP corner
             coords = list(result.exterior.coords)[:-1]
             target_point = min(coords, key=lambda p: (p[0], p[1]))
