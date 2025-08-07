@@ -267,6 +267,18 @@ def filter_redundant_vectors(vectors: list, vector_edges: list) -> tuple:
 
     return filtered_vectors, filtered_edges
 
+
+def cap_translation_vectors(vectors: list, length: float) -> list:
+    capped_vectors = []
+    for vx, vy in vectors:
+        vec_length = math.hypot(vx, vy)
+        if vec_length > length:
+            scale = length / vec_length
+            vx *= scale
+            vy *= scale
+        capped_vectors.append((vx, vy))
+    return capped_vectors
+
 # ----- more general helpers -----
 
 def precision_aware_intersection(obj1, obj2, precision=INTERSECTION_PRECISION):

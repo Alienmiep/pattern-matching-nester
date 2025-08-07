@@ -54,7 +54,9 @@ while not nfp_is_closed_loop:
         merged_linestring = line_merge(intersection)
         if merged_linestring.geom_type == "LineString":
             shared_points = [Point(merged_linestring.coords[0]), Point(merged_linestring.coords[-1])]
+            linestring_intersection_length = merged_linestring.length
         elif merged_linestring.geom_type == "MultiLineString":
+            linestring_intersection_length = 0
             for line in merged_linestring.geoms:
                 shared_points.append(Point(line.coords[0]))
                 shared_points.append(Point(line.coords[-1]))
@@ -143,6 +145,9 @@ while not nfp_is_closed_loop:
     print("feasible translation vectors: ", feasible_translation_vectors)
     print("edges used to generate them: ", feasible_translation_vectors_edges)
     print("NFP edges so far:", nfp_edges)
+    if line_intersection_flag and linestring_intersection_length:
+        # cap the length of the translation vector to the length of the intersection
+        feasible_translation_vectors = helper.cap_translation_vectors(feasible_translation_vectors, linestring_intersection_length)
 
     if len(feasible_translation_vectors) > 1:
         # when dealing with rectangular pieces, we might end up with a seemingly possible translation vector that can't be detected by the feasability check
@@ -191,6 +196,9 @@ while not nfp_is_closed_loop:
     trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points)
     trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, reverse=True)
     print("trimmed translation vector: ", trimmed_translation_vector)
+
+    if trimmed_translation_vector[0] == 0 and trimmed_translation_vector[1] == 0:
+        raise Exception("Translation vector (0,0) is not allowed")
 
     # 2e) apply feasible translation
     b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
