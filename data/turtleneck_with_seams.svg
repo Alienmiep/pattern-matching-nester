@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink" baseProfile="full" height="56.928138384933334cm" version="1.1" viewBox="-69.56815211449253 -149.0 284.27260845797014 56.928138384933334" width="284.27260845797014cm">
+  <metadata>
+    <seams>
+      <seam>
+        <id>1</id>
+        <seampart>
+          <part>left_turtle_front</part>
+          <start>9.625622648865935, 7.0</start>
+          <end>9.625622648865935, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>left_turtle_back</part>
+          <start>7.924626976951987, 0.0</start>
+          <end>7.924626976951987, 7.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>2</id>
+        <seampart>
+          <part>left_sleeve_f</part>
+          <start>52.585238816874444, 0.0</start>
+          <end>0.0, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>left_sleeve_b</part>
+          <start>0.010093572339975765, 0.0</start>
+          <end>52.59533238921442, 0.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>3</id>
+        <seampart>
+          <part>left_sleeve_f</part>
+          <start>13.585238816874444, 16.814431853239945</start>
+          <end>52.585238816874444, 13.451545482591957</end>
+        </seampart>
+        <seampart>
+          <part>left_sleeve_b</part>
+          <start>52.59533238921442, 13.45154548259198</start>
+          <end>13.59533238921442, 16.814431853239974</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>4</id>
+        <seampart>
+          <part>left_sleeve_f</part>
+          <start>0.0, 0.0</start>
+          <end>13.585238816874444, 16.814431853239945</end>
+        </seampart>
+        <seampart>
+          <part>left_ftorso</part>
+          <start>25.0, 21.69877899971849</start>
+          <end>16.998647456366168, 2.5488211441107893</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>5</id>
+        <seampart>
+          <part>left_sleeve_b</part>
+          <start>0.0, 0.8438810856673093</start>
+          <end>0.010093572339975765, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>left_ftorso</part>
+          <start>16.998647456366168, 2.5488211441107893</start>
+          <end>17.0, 1.6751059804269488</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>6</id>
+        <seampart>
+          <part>left_sleeve_b</part>
+          <start>13.59533238921442, 16.814431853239974</start>
+          <end>0.0, 0.8438810856673093</end>
+        </seampart>
+        <seampart>
+          <part>left_btorso</part>
+          <start>17.0, 1.6751068138012997</start>
+          <end>20.0, 21.698779833092836</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>7</id>
+        <seampart>
+          <part>left_ftorso</part>
+          <start>7.499999999999997, 0.0</start>
+          <end>0.0, 5.091640417221015</end>
+        </seampart>
+        <seampart>
+          <part>left_turtle_front</part>
+          <start>0.0, 7.0</start>
+          <end>9.625622648865935, 7.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>8</id>
+        <seampart>
+          <part>left_btorso</part>
+          <start>0.0, 2.2040872588558216</start>
+          <end>7.499999999999995, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>left_turtle_back</part>
+          <start>7.924626976951987, 7.0</start>
+          <end>0.0, 7.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>9</id>
+        <seampart>
+          <part>left_ftorso</part>
+          <start>17.0, 1.6751059804269488</start>
+          <end>7.499999999999997, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>left_btorso</part>
+          <start>7.499999999999995, 0.0</start>
+          <end>17.0, 1.6751068138012997</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>10</id>
+        <seampart>
+          <part>left_ftorso</part>
+          <start>25.0, 44.204087141094675</start>
+          <end>25.0, 21.69877899971849</end>
+        </seampart>
+        <seampart>
+          <part>left_btorso</part>
+          <start>20.0, 21.698779833092836</start>
+          <end>20.0, 44.20408749919405</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>11</id>
+        <seampart>
+          <part>right_turtle_front</part>
+          <start>0.0, 0.0</start>
+          <end>0.0, 7.0</end>
+        </seampart>
+        <seampart>
+          <part>right_turtle_back</part>
+          <start>0.0, 7.0</start>
+          <end>0.0, 0.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>12</id>
+        <seampart>
+          <part>right_sleeve_f</part>
+          <start>52.585238816874444, 0.0</start>
+          <end>0.0, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>right_sleeve_b</part>
+          <start>0.0, 0.0</start>
+          <end>52.585238816874444, 0.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>13</id>
+        <seampart>
+          <part>right_sleeve_f</part>
+          <start>0.0, 13.451545482591957</start>
+          <end>39.0, 16.814431853239945</end>
+        </seampart>
+        <seampart>
+          <part>right_sleeve_b</part>
+          <start>39.0, 16.814431853239974</start>
+          <end>0.0, 13.45154548259198</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>14</id>
+        <seampart>
+          <part>right_sleeve_f</part>
+          <start>39.0, 16.814431853239945</start>
+          <end>52.585238816874444, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>right_ftorso</part>
+          <start>8.001352543633832, 2.5488211441107893</start>
+          <end>0.0, 21.69877899971849</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>15</id>
+        <seampart>
+          <part>right_sleeve_b</part>
+          <start>52.585238816874444, 0.0</start>
+          <end>52.59533238921442, 0.8438810856673093</end>
+        </seampart>
+        <seampart>
+          <part>right_ftorso</part>
+          <start>8.0, 1.6751059804269488</start>
+          <end>8.001352543633832, 2.5488211441107893</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>16</id>
+        <seampart>
+          <part>right_sleeve_b</part>
+          <start>52.59533238921442, 0.8438810856673093</start>
+          <end>39.0, 16.814431853239974</end>
+        </seampart>
+        <seampart>
+          <part>right_btorso</part>
+          <start>0.0, 21.698779833092836</start>
+          <end>3.0, 1.6751068138012997</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>17</id>
+        <seampart>
+          <part>right_ftorso</part>
+          <start>25.0, 5.091640417221015</start>
+          <end>17.500000000000004, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>right_turtle_front</part>
+          <start>0.0, 7.0</start>
+          <end>9.625622648865935, 7.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>18</id>
+        <seampart>
+          <part>right_btorso</part>
+          <start>12.500000000000005, 0.0</start>
+          <end>20.0, 2.2040872588558216</end>
+        </seampart>
+        <seampart>
+          <part>right_turtle_back</part>
+          <start>7.924626976951987, 7.0</start>
+          <end>0.0, 7.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>19</id>
+        <seampart>
+          <part>right_ftorso</part>
+          <start>17.500000000000004, 0.0</start>
+          <end>8.0, 1.6751059804269488</end>
+        </seampart>
+        <seampart>
+          <part>right_btorso</part>
+          <start>3.0, 1.6751068138012997</start>
+          <end>12.500000000000005, 0.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>20</id>
+        <seampart>
+          <part>right_ftorso</part>
+          <start>0.0, 21.69877899971849</start>
+          <end>0.0, 44.204087141094675</end>
+        </seampart>
+        <seampart>
+          <part>right_btorso</part>
+          <start>0.0, 44.20408749919405</start>
+          <end>0.0, 21.698779833092836</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>21</id>
+        <seampart>
+          <part>right_ftorso</part>
+          <start>25.0, 44.204087141094675</start>
+          <end>25.0, 5.091640417221015</end>
+        </seampart>
+        <seampart>
+          <part>left_ftorso</part>
+          <start>0.0, 5.091640417221015</start>
+          <end>0.0, 44.204087141094675</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>22</id>
+        <seampart>
+          <part>right_turtle_front</part>
+          <start>9.625622648865935, 7.0</start>
+          <end>9.625622648865935, 0.0</end>
+        </seampart>
+        <seampart>
+          <part>left_turtle_front</part>
+          <start>0.0, 0.0</start>
+          <end>0.0, 7.0</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>23</id>
+        <seampart>
+          <part>right_btorso</part>
+          <start>20.0, 2.2040872588558216</start>
+          <end>20.0, 44.20408749919405</end>
+        </seampart>
+        <seampart>
+          <part>left_btorso</part>
+          <start>0.0, 44.20408749919405</start>
+          <end>0.0, 2.2040872588558216</end>
+        </seampart>
+      </seam>
+      <seam>
+        <id>24</id>
+        <seampart>
+          <part>right_turtle_back</part>
+          <start>7.924626976951987, 0.0</start>
+          <end>7.924626976951987, 7.0</end>
+        </seampart>
+        <seampart>
+          <part>left_turtle_back</part>
+          <start>0.0, 7.0</start>
+          <end>0.0, 0.0</end>
+        </seampart>
+      </seam>
+    </seams>
+  </metadata>
+  <defs/>
+  <path d="M 9.625622648865935,-140.0 L 9.625622648865935,-147.0 L 0.0,-147.0 L 0.0,-140.0 L 9.625622648865935,-140.0" fill="rgb(227,175,186)" name="left_turtle_front" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M -9.625622648865935,-140.0 L 0.0,-140.0 L 0.0,-147.0 L -9.625622648865935,-147.0 L -9.625622648865935,-140.0" fill="rgb(227,175,186)" name="right_turtle_front" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 67.56815211449253,-104.37634328336844 L 27.285522128741476,-138.17748324726298 C 21.31804016935333,-130.49385199474892 27.127806735136033,-123.36425964220747 26.884310373671077,-116.56445797576627 L 58.92166534714749,-94.07186161506668 L 67.56815211449253,-104.37634328336844" fill="rgb(227,175,186)" name="left_sleeve_f" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M -67.56815211449253,-104.37634328336844 L -58.92166534714748,-94.07186161506668 L -26.884310373671077,-116.56445797576627 C -27.127806735136033,-123.36425964220747 -21.31804016935334,-130.49385199474892 -27.285522128741476,-138.17748324726298 L -67.56815211449253,-104.37634328336844" fill="rgb(227,175,186)" name="right_sleeve_f" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 0.0,-98.88163490354233 L 22.5,-98.88163490354233 L 25.0,-98.88163490354233 L 25.0,-121.38694304491852 C 16.609720998005777,-122.56116750379464 16.970603455317192,-129.43758667077662 16.998647456366168,-140.53690090052623 C 16.999376130114545,-140.82529694252042 16.999880095209612,-141.11654398037993 17.0,-141.41061606421005 L 7.499999999999997,-143.085722044637 A 8.06958027322057,8.06958027322057 0.0 0,1 0.0,-137.994081627416 L 0.0,-98.88163490354233" fill="rgb(227,175,186)" name="left_ftorso" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 0.0,-98.88163490354233 L 0.0,-137.994081627416 A 8.06958027322057,8.06958027322057 0.0 0,1 -7.4999999999999964,-143.085722044637 L -17.0,-141.41061606421005 C -16.999880095209612,-141.11654398037993 -16.999376130114545,-140.82529694252042 -16.998647456366168,-140.53690090052623 C -16.97060345531719,-129.43758667077662 -16.609720998005777,-122.56116750379464 -25.0,-121.38694304491852 L -25.0,-98.88163490354233 L -22.5,-98.88163490354233 L 0.0,-98.88163490354233" fill="rgb(227,175,186)" name="right_ftorso" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 145.13630422898507,-98.0 L 145.13630422898507,-140.00000024033824 A 13.862427723567794,13.862427723567794 0.0 0,0 152.63630422898507,-142.20408749919406 L 162.13630422898507,-140.52898068539275 C 159.63156962512676,-129.91714417574698 157.52801867223303,-123.46004226995953 165.13630422898507,-120.50530766610123 L 165.13630422898507,-98.0 L 145.13630422898507,-98.0" fill="rgb(227,175,186)" name="left_btorso" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 145.13630422898507,-98.0 L 125.13630422898507,-98.0 L 125.13630422898507,-120.50530766610123 C 132.7445897857371,-123.46004226995953 130.64103883284338,-129.91714417574698 128.13630422898507,-140.52898068539275 L 137.63630422898507,-142.20408749919406 A 13.862427723567794,13.862427723567794 0.0 0,0 145.13630422898507,-140.00000024033824 L 145.13630422898507,-98.0" fill="rgb(227,175,186)" name="right_btorso" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 212.7044563434776,-104.37634328336844 L 204.05796957613254,-94.07186161506667 L 172.0206146026561,-116.56445797576625 C 171.93098526141785,-123.06068502522832 166.00324539658016,-129.97674642018143 171.87165792680852,-137.53752085417193 C 172.05380589263098,-137.7604516089487 172.2372170200319,-137.9736398973491 172.42182635772656,-138.17748324726298 L 212.7044563434776,-104.37634328336844" fill="rgb(227,175,186)" name="left_sleeve_b" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 77.56815211449253,-104.37634328336844 L 117.85078210024359,-138.17748324726298 C 118.03539143793826,-137.9736398973491 118.21880256533916,-137.7604516089487 118.40095053116161,-137.53752085417193 C 124.26936306138997,-129.97674642018143 118.34162319655232,-123.06068502522832 118.25199385531401,-116.56445797576625 L 86.2146388818376,-94.07186161506667 L 77.56815211449253,-104.37634328336844" fill="rgb(227,175,186)" name="right_sleeve_b" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 153.06093120593707,-140.0 L 145.13630422898507,-140.0 L 145.13630422898507,-147.0 L 153.06093120593707,-147.0 L 153.06093120593707,-140.0" fill="rgb(227,175,186)" name="left_turtle_back" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+  <path d="M 137.21167725203307,-140.0 L 137.21167725203307,-147.0 L 145.13630422898507,-147.0 L 145.13630422898507,-140.0 L 137.21167725203307,-140.0" fill="rgb(227,175,186)" name="right_turtle_back" stroke="rgb(51,51,51)" stroke-width="0.2"/>
+</svg>

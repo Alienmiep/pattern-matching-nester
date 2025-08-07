@@ -46,9 +46,15 @@ while not nfp_is_closed_loop:
         shared_points = [intersection]
     elif intersection.geom_type == "MultiPoint":
         shared_points = list(intersection.geoms)
-    elif intersection.geom_type == "LineString":
+    elif intersection.geom_type in ["LineString", "MultiLineString"]:
         line_intersection_flag = True
-        shared_points = [Point(coord) for coord in intersection.coords]
+        merged_linestring = line_merge(intersection)
+        if merged_linestring.geom_type == "LineString":
+            shared_points = [Point(merged_linestring.coords[0]), Point(merged_linestring.coords[-1])]
+        elif merged_linestring.geom_type == "MultiLineString":
+            for line in merged_linestring.geoms:
+                shared_points.append(Point(line.coords[0]))
+                shared_points.append(Point(line.coords[-1]))
     elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
         raise Exception("Polygons seem to overlap")
 
