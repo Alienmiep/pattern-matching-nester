@@ -1,6 +1,6 @@
 from itertools import product
 
-from shapely import set_precision
+from shapely import set_precision, orient_polygons, line_merge
 from shapely.geometry import Polygon, Point
 from shapely.affinity import translate
 import matplotlib.pyplot as plt
@@ -9,10 +9,13 @@ import helper as helper
 from helper import EdgePair, INTERSECTION_PRECISION
 
 # a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
-a_poly = Polygon([(73, 0), (73, 58.5), (0, 58.5), (0, 0), (73, 0)])
+# a_poly = Polygon([(73, 0), (73, 58.5), (0, 58.5), (0, 0), (73, 0)])
+a_poly = orient_polygons(Polygon([(-22.5, 98.9), (-25.0, 98.9), (-25.0, 121.4), (-21.9, 122.2), (-19.7, 123.8), (-18.3, 125.9), (-17.5, 128.7), (-17.1, 132.1), (-17.0, 136.0), (-17.0, 140.5), (-17.0, 140.8), (-17.0, 141.1), (-17.0, 141.4), (-7.5, 143.1), (-5.8, 140.4), (-3.1, 138.6), (-0.0, 138.0), (3.1, 138.6), (5.8, 140.4), (7.5, 143.1), (17.0, 141.4), (17.0, 141.1), (17.0, 140.8), (17.0, 140.5), (17.0, 136.0), (17.1, 132.1), (17.5, 128.7), (18.3, 125.9), (19.7, 123.8), (21.9, 122.2), (25.0, 121.4), (25.0, 98.9), (22.5, 98.9), (0.0, 98.9)]))
 a_poly_edges = helper.get_edges(a_poly)
+
 # b_poly_untranslated = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
-b_poly_untranslated = Polygon([(108.8, 111.0), (108.8, 169.5), (61.5, 169.5), (61.5, 111.0)])
+# b_poly_untranslated = Polygon([(108.8, 111.0), (108.8, 169.5), (61.5, 169.5), (61.5, 111.0)])
+b_poly_untranslated = orient_polygons(Polygon([(142.5, 140.3), (140.0, 141.0), (137.6, 142.2), (128.1, 140.5), (129.2, 136.2), (130.0, 132.4), (130.4, 129.1), (130.3, 126.3), (129.5, 123.9), (127.8, 122.0), (125.1, 120.5), (125.1, 98.0), (145.1, 98.0), (165.1, 98.0), (165.1, 120.5), (162.4, 122.0), (160.8, 123.9), (160.0, 126.3), (159.9, 129.1), (160.3, 132.4), (161.1, 136.2), (162.1, 140.5), (152.6, 142.2), (150.3, 141.0), (147.8, 140.3), (145.1, 140.0)]))
 
 # 1. setup
 # TODO more advanced version where you give a reference point and then try to find a touching, non-intersecting position for b_poly
@@ -27,7 +30,7 @@ pt_b_ymax = max(b_poly_untranslated.exterior.coords, key=lambda p: p[1])
 # translate B with trans: B->A = pt_a_ymin - pt_b_ymax
 dx = pt_a_ymin[0] - pt_b_ymax[0]
 dy = pt_a_ymin[1] - pt_b_ymax[1]
-b_poly = translate(b_poly_untranslated, xoff=dx, yoff=dy)
+b_poly = orient_polygons(translate(b_poly_untranslated, xoff=dx, yoff=dy))
 b_poly_edges = helper.get_edges(b_poly)
 
 if not a_poly.touches(b_poly):
@@ -190,9 +193,8 @@ while not nfp_is_closed_loop:
     print("trimmed translation vector: ", trimmed_translation_vector)
 
     # 2e) apply feasible translation
-    # b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
-    # b_poly = set_precision(b_poly_imprecise, INTERSECTION_PRECISION)  # TODO precision
-    b_poly = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
+    b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
+    b_poly = orient_polygons(set_precision(b_poly_imprecise, INTERSECTION_PRECISION))
     b_poly_edges = helper.get_edges(b_poly)
     nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
     nfp_edges.append(untrimmed_translation_edge)
