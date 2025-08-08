@@ -188,11 +188,13 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
                 if known_intersection.geom_type in ["LineString", "MultiLineString"]:
                     if intersection_point_is_within_linestring(intersection_point, known_intersection):
                         continue
-                print("intersection point is not in shared_vertices")
-                print(intersection, shared_vertices, intersection in shared_vertices)
             elif intersection.geom_type == "LineString":  # can happen in edge cases 2 and 3
-                print("Skipped due to LineString intersection")
-                continue
+                intersection_point = intersection.coords[0]
+                if Point(intersection_point) in shared_vertices or Point(intersection.coords[1]) in shared_vertices:
+                    continue
+                if known_intersection.geom_type in ["LineString", "MultiLineString"]:
+                    if intersection_point_is_within_linestring(intersection_point, known_intersection):
+                        continue
             else:
                 # example: GEOMETRYCOLLECTION (LINESTRING (10.571428571428571 9.714285714285714, 11 10), POINT (8 8))
                 intersection_point = find_closest_intersection(start, intersection)
