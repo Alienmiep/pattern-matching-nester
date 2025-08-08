@@ -11,13 +11,14 @@ from shapely import Polygon, LineString, MultiLineString, set_precision
 from shapely.geometry import box
 
 from models.piece import Piece
+from models.pattern import Pattern
 from svg_helper import *
 from ifp import ifp
 from nfp import nfp
 from helper import INTERSECTION_PRECISION
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_pattern_full.svg")
+SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
 MERGE_PIECES = True
 MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
@@ -334,14 +335,11 @@ class PolygonViewer(QMainWindow):
 
         result = main_polygon
         for index, poly in enumerate(polygons_to_subtract):
-            print(poly)
-            print(self.current_piece_vertices_calc)
             nfp_poly = nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
             self.shapes[f"nfp_{index}"] = list(nfp_poly.exterior.coords)
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
             result_imprecise = result.difference(nfp_poly)
             result = set_precision(result_imprecise, INTERSECTION_PRECISION)
-            print(result)
 
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(result)
@@ -349,7 +347,6 @@ class PolygonViewer(QMainWindow):
                 (pt for line in self.fabric_texture for pt in line.coords),
                 key=lambda p: (p[0], p[1])
             )
-            print(target_point)
         else:  # just use IFP corner
             coords = list(result.exterior.coords)[:-1]
             target_point = min(coords, key=lambda p: (p[0], p[1]))
@@ -382,14 +379,15 @@ if __name__ == '__main__':
     merged_pieces.sort(key=lambda p: p.area(), reverse=True)
     for p in merged_pieces:
         print(f"Piece {p.index}, Area: {p.area()}")
+        print(p.vertices)
 
-    # seams = parse_svg_metadata(SVG_FILE)
-    # for seam in seams:
-    #     print(f"Seam ID: {seam.id}")
-    #     for part in seam.seamparts:
-    #         print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}, Direction: {part.direction}")
+    seams = parse_svg_metadata(SVG_FILE)
+    for seam in seams:
+        print(f"Seam ID: {seam.id}")
+        for part in seam.seamparts:
+            print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}")
 
-    # full_pattern = Pattern(merged_pieces, seams)
+    full_pattern = Pattern(merged_pieces, seams)
 
     app = QApplication(sys.argv)
     viewer = PolygonViewer(merged_pieces)

@@ -15,7 +15,7 @@ class Seampart:
     part: str
     start: tuple
     end: tuple
-    direction: bool
+    # direction: bool
 
 
 @dataclass
@@ -323,11 +323,11 @@ def parse_svg_metadata(svg_path: str) -> list:
     # seamdefinition has a weird namespace TODO
     for child in metadata:
         namespace = child.tag[1:].split("}")[0] if child.tag.startswith("{") else None
-        if child.tag.endswith('seamdefinition'):
+        if child.tag.endswith('seams'):
             seamdefinition = child
             break
     else:
-        raise ValueError("No <seamdefinition> tag found in metadata")
+        raise ValueError("No <seams> tag found in metadata")
 
     ns = f'{{{namespace}}}' if namespace else ''
     seams = []
@@ -340,8 +340,8 @@ def parse_svg_metadata(svg_path: str) -> list:
             part = part_elem.find(f'{ns}part').text
             start = parse_coord(part_elem.find(f'{ns}start').text)
             end = parse_coord(part_elem.find(f'{ns}end').text)
-            direction = part_elem.find(f'{ns}direction').text.lower() == 'true'  # :/
-            seamparts.append(Seampart(part, start, end, direction))
+            # direction = part_elem.find(f'{ns}direction').text.lower() == 'true'  # :/
+            seamparts.append(Seampart(part, start, end))
 
         seams.append(Seam(seam_id, seamparts))
 
