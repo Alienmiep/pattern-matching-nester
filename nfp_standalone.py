@@ -193,8 +193,9 @@ while not nfp_is_closed_loop:
     # trim translation vector as you go
     # TODO this can be used to eliminate intersection tests
 
-    trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points)
-    trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, reverse=True)
+    trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points, intersection)
+    print("after first trim", trimmed_translation_vector)
+    trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, intersection, reverse=True)
     print("trimmed translation vector: ", trimmed_translation_vector)
 
     if trimmed_translation_vector[0] == 0 and trimmed_translation_vector[1] == 0:
