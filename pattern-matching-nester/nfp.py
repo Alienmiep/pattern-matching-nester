@@ -1,6 +1,6 @@
 from itertools import product
 
-from shapely import set_precision
+from shapely import set_precision, orient_polygons, line_merge
 from shapely.geometry import Polygon, Point
 from shapely.affinity import translate
 
@@ -10,7 +10,8 @@ from helper import EdgePair, INTERSECTION_PRECISION
 a_poly_local = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 b_poly_untranslated_local = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
 
-def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> Polygon:
+def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> Polygon:
+    a_poly = orient_polygons(a_poly_raw)
     a_poly_edges = helper.get_edges(a_poly)
     # 1. setup
     # TODO more advanced version where you give a reference point and then try to find a touching, non-intersecting position for b_poly
@@ -25,12 +26,11 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
     # translate B with trans: B->A = pt_a_ymin - pt_b_ymax
     dx = pt_a_ymin[0] - pt_b_ymax[0]
     dy = pt_a_ymin[1] - pt_b_ymax[1]
-    b_poly = translate(b_poly_untranslated, xoff=dx, yoff=dy)
+    b_poly = orient_polygons(translate(b_poly_untranslated, xoff=dx, yoff=dy))
     b_poly_edges = helper.get_edges(b_poly)
 
     if not a_poly.touches(b_poly):
         raise Exception("Polygons need to touch at the start")
-
 
     nfp_is_closed_loop = False
     while not nfp_is_closed_loop:
@@ -44,9 +44,17 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
             shared_points = [intersection]
         elif intersection.geom_type == "MultiPoint":
             shared_points = list(intersection.geoms)
-        elif intersection.geom_type == "LineString":
+        elif intersection.geom_type in ["LineString", "MultiLineString"]:
             line_intersection_flag = True
-            shared_points = [Point(coord) for coord in intersection.coords]
+            merged_linestring = line_merge(intersection)
+            if merged_linestring.geom_type == "LineString":
+                shared_points = [Point(merged_linestring.coords[0]), Point(merged_linestring.coords[-1])]
+                linestring_intersection_length = merged_linestring.length
+            elif merged_linestring.geom_type == "MultiLineString":
+                linestring_intersection_length = 0
+                for line in merged_linestring.geoms:
+                    shared_points.append(Point(line.coords[0]))
+                    shared_points.append(Point(line.coords[-1]))
         elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
             raise Exception("Polygons seem to overlap")
             # TODO see how this reacts to touching along an edge
@@ -138,6 +146,10 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
         print("feasible translation vectors: ", feasible_translation_vectors)
         print("edges used to generate them: ", feasible_translation_vectors_edges)
         print("NFP edges so far:", nfp_edges)
+        if line_intersection_flag and linestring_intersection_length:
+            # cap the length of the translation vector to the length of the intersection
+            feasible_translation_vectors = helper.cap_translation_vectors(feasible_translation_vectors, linestring_intersection_length)
+
 
         if not feasible_translation_vectors:
             raise Exception("NFP loop is still open, but no feasible translation vectors were found")
@@ -162,11 +174,9 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
                 for index, candidate in enumerate(feasible_translation_vectors):
                     translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
                     angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
-                    print(angle)
                     if angle != 90.0 and angle != 270.0:
                         actually_feasible_vectors.append(candidate)
                         actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
-                print("actually feasible: ", actually_feasible_vectors)
                 if len(actually_feasible_vectors) > 1:
                     raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
                 if not actually_feasible_vectors:
@@ -186,12 +196,13 @@ def nfp(a_poly: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> 
         # trim translation vector as you go
         # TODO this can be used to eliminate intersection tests
 
-        trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points)
-        trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, reverse=True)
+        trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points, intersection)
+        trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, intersection, reverse=True)
         print("trimmed translation vector: ", trimmed_translation_vector)
 
         # 2e) apply feasible translation
-        b_poly = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
+        b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
+        b_poly = orient_polygons(set_precision(b_poly_imprecise, INTERSECTION_PRECISION))
         b_poly_edges = helper.get_edges(b_poly)
         nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
         nfp_edges.append(untrimmed_translation_edge)

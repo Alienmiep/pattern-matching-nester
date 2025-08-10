@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 
 from shapely import set_precision
-from shapely.geometry import Polygon, Point, LineString
+from shapely.geometry import Polygon, Point, LineString, MultiLineString
 from shapely.ops import nearest_points
 
 INTERSECTION_PRECISION = 0.01
@@ -162,7 +162,7 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
             return location_b != disallowed_side_b
 
 
-def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertices: list, reverse: bool = False) -> tuple:
+def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translation_vector: tuple, shared_vertices: list, known_intersection, reverse: bool = False) -> tuple:
     dx, dy = translation_vector
     if reverse:
         dx, dy = -dx, -dy
@@ -184,9 +184,17 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
                 intersection_point = intersection.coords[0]
                 if intersection in shared_vertices:
                     continue
+                # second check: in case of (Multi)LineString intersection, a vertex may be along the intersection without being mentioned in the shared_vertices
+                if known_intersection.geom_type in ["LineString", "MultiLineString"]:
+                    if intersection_point_is_within_linestring(intersection_point, known_intersection):
+                        continue
             elif intersection.geom_type == "LineString":  # can happen in edge cases 2 and 3
-                print("Skipped due to LineString intersection")
-                continue
+                intersection_point = intersection.coords[0]
+                if Point(intersection_point) in shared_vertices or Point(intersection.coords[1]) in shared_vertices:
+                    continue
+                if known_intersection.geom_type in ["LineString", "MultiLineString"]:
+                    if intersection_point_is_within_linestring(intersection_point, known_intersection):
+                        continue
             else:
                 # example: GEOMETRYCOLLECTION (LINESTRING (10.571428571428571 9.714285714285714, 11 10), POINT (8 8))
                 intersection_point = find_closest_intersection(start, intersection)
@@ -202,7 +210,19 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
     return (dx, dy)
 
 
-def find_closest_intersection(start: tuple, geometry_collection) -> Point | None:
+def intersection_point_is_within_linestring(intersection_coords: tuple, intersection: LineString | MultiLineString) -> bool:
+    # if intersections within a linestring are allowed, use distance() instead
+    if isinstance(intersection, LineString):
+        return intersection_coords in intersection.coords
+
+    elif isinstance(intersection, MultiLineString):
+        for linestring in intersection.geoms:
+            if intersection_coords in linestring.coords:
+                return True
+        return False
+
+
+def find_closest_intersection(start: tuple, geometry_collection) -> tuple | None:
     start_point = Point(start)
     closest_point = None
     min_distance = float("inf")
@@ -266,6 +286,18 @@ def filter_redundant_vectors(vectors: list, vector_edges: list) -> tuple:
         filtered_edges.append(edge)
 
     return filtered_vectors, filtered_edges
+
+
+def cap_translation_vectors(vectors: list, length: float) -> list:
+    capped_vectors = []
+    for vx, vy in vectors:
+        vec_length = math.hypot(vx, vy)
+        if vec_length > length:
+            scale = length / vec_length
+            vx *= scale
+            vy *= scale
+        capped_vectors.append((vx, vy))
+    return capped_vectors
 
 # ----- more general helpers -----
 

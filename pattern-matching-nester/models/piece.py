@@ -44,7 +44,7 @@ class Piece():
                 if (x, y) not in vertices:
                     vertices.append((x, y))  # avoid duplicate points
 
-        return vertices[::-1]  # reverse order of vertices
+        return vertices  # do not reverse order of vertices, that is done at the start of NFP
 
     def area(self):
         polygon = Polygon(self.vertices)
