@@ -200,6 +200,9 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, intersection, reverse=True)
         print("trimmed translation vector: ", trimmed_translation_vector)
 
+        if trimmed_translation_vector[0] == 0 and trimmed_translation_vector[1] == 0:
+            raise Exception("Translation vector (0,0) is not allowed")
+
         # 2e) apply feasible translation
         b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
         b_poly = orient_polygons(set_precision(b_poly_imprecise, INTERSECTION_PRECISION))
