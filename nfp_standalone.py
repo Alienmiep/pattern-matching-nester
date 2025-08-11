@@ -5,8 +5,8 @@ from shapely.geometry import Polygon, Point
 from shapely.affinity import translate
 import matplotlib.pyplot as plt
 
-import helper as helper
-from helper import EdgePair, INTERSECTION_PRECISION
+import helper_nfp_standalone as helper
+from helper_nfp_standalone import EdgePair, INTERSECTION_PRECISION
 
 # a_poly = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 # a_poly = Polygon([(73, 0), (73, 58.5), (0, 58.5), (0, 0), (73, 0)])
