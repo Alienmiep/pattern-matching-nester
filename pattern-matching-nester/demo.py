@@ -265,10 +265,8 @@ class PolygonViewer(QMainWindow):
 
         self.__clear_ifp_nfp()  # remove previous polygons, if needed
         self.current_piece: Piece = self.pieces.pop(0)
-        if not self.current_piece.aabb:
-            self.current_piece.aabb = bounding_box_from_polygon(self.current_piece.vertices)
         self.current_piece_vertices_draw = self.current_piece.vertices
-        self.current_piece_vertices_calc = self.current_piece.aabb
+        self.current_piece_vertices_calc = self.current_piece.vertices
         self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
@@ -301,9 +299,8 @@ class PolygonViewer(QMainWindow):
 
     def translate_current_piece(self, translation) -> None:
         self.current_piece.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece.vertices]
-        self.current_piece.aabb = bounding_box_from_polygon(self.current_piece.vertices)
         self.current_piece_vertices_draw = self.current_piece.vertices
-        self.current_piece_vertices_calc = self.current_piece.aabb
+        self.current_piece_vertices_calc = self.current_piece.vertices
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
         self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
 
@@ -331,7 +328,7 @@ class PolygonViewer(QMainWindow):
 
         reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
         main_polygon = Polygon(self.shapes["ifp"])
-        polygons_to_subtract = [Polygon(x.aabb) for x in self.placed_pieces]
+        polygons_to_subtract = [Polygon(x.vertices) for x in self.placed_pieces]
 
         result = main_polygon
         for index, poly in enumerate(polygons_to_subtract):
@@ -369,7 +366,6 @@ if __name__ == '__main__':
     pieces = []
     for index, path in enumerate(paths):
         piece = Piece(index, path, unit_scale)
-        piece.aabb = bounding_box_from_polygon(piece.vertices)
         pieces.append(piece)
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
