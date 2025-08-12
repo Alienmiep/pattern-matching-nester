@@ -64,8 +64,8 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
 
 def translation_vector_from_edge_pair(pair: EdgePair) -> tuple:
     # 1. find out whether the touching vertex is start of end of a/b
-    edge_a_part = "start" if Point(pair.edge_a.coords[0]) == pair.shared_vertex else "end"
-    edge_b_part = "start" if Point(pair.edge_b.coords[0]) == pair.shared_vertex else "end"
+    edge_a_part = "start" if set_precision(Point(pair.edge_a.coords[0]), INTERSECTION_PRECISION) == pair.shared_vertex else "end"
+    edge_b_part = "start" if set_precision(Point(pair.edge_b.coords[0]), INTERSECTION_PRECISION) == pair.shared_vertex else "end"
 
     # 2. find out if edge b is left or right (or parallel) of edge a
     relative_position = is_left_or_right(pair.edge_a, pair.edge_b)
@@ -145,6 +145,9 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
         case 2:
             # side of a that b is on, but only use the part of a betweeen shared_vertex and its end
             trimmed_a = LineString([shared_vertex, (pair.edge_a.coords[1])])
+            if trimmed_a.length < INTERSECTION_PRECISION:
+                return True
+
             allowed_side_a = is_left_or_right(trimmed_a, pair.edge_b)
             if allowed_side_a == "parallel":  # in cases 2 and 3 that means the two edges are laying on top of each other
                 return True
@@ -154,6 +157,9 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
         case 3:
             # side of b that a is not on, but only use the part of b betweeen shared_vertex and its end
             trimmed_b = LineString([shared_vertex, (pair.edge_b.coords[1])])
+            if trimmed_b.length < INTERSECTION_PRECISION:
+                return True
+
             disallowed_side_b = is_left_or_right(trimmed_b, pair.edge_a)
             if disallowed_side_b == "parallel":
                 return True
@@ -198,6 +204,8 @@ def trim_translation_vector(source_poly: Polygon, target_poly: Polygon, translat
             else:
                 # example: GEOMETRYCOLLECTION (LINESTRING (10.571428571428571 9.714285714285714, 11 10), POINT (8 8))
                 intersection_point = find_closest_intersection(start, intersection)
+                if Point(intersection_point) in shared_vertices:
+                    continue
 
             # Set vector to go only up to the intersection point
             ix, iy = intersection_point
