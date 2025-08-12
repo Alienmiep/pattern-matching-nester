@@ -364,8 +364,9 @@ if __name__ == '__main__':
     paths = load_selected_paths(SVG_FILE)
 
     pieces = []
-    for index, path in enumerate(paths):
-        piece = Piece(index, path, unit_scale)
+    for index, path_tuple in enumerate(paths):
+        name, path = path_tuple
+        piece = Piece(index, name, path, unit_scale)
         pieces.append(piece)
 
     merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces

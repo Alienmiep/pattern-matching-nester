@@ -4,8 +4,9 @@ from shapely.geometry import Polygon
 COORDINATE_DECIMAL_PLACES = 1
 
 class Piece():
-    def __init__(self, index: int, path: Path, unit_scale: float):
+    def __init__(self, index: int, name: str, path: Path, unit_scale: float):
         self.index = index
+        self.name = name
         self.path = path
         self.vertices = self.__extract_vertices(unit_scale)
         self.aabb = None
