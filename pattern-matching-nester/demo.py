@@ -369,22 +369,17 @@ if __name__ == '__main__':
         piece = Piece(index, name, path, unit_scale)
         pieces.append(piece)
 
-    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
-    for p in merged_pieces:
-        print(f"Piece {p.index}, Area: {p.area()}")
-    print("-------")
-    merged_pieces.sort(key=lambda p: p.area(), reverse=True)
-    for p in merged_pieces:
-        print(f"Piece {p.index}, Area: {p.area()}")
-        print(p.vertices)
-
     seams = parse_svg_metadata(SVG_FILE)
     for seam in seams:
         print(f"Seam ID: {seam.id}")
         for part in seam.seamparts:
             print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}")
 
-    full_pattern = Pattern(merged_pieces, seams)
+    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
+    merged_pieces.sort(key=lambda p: p.area(), reverse=True)
+    reduced_seams = reduce_seams(merged_pieces, seams) if MERGE_PIECES else seams
+
+    full_pattern = Pattern(merged_pieces, reduced_seams)
 
     app = QApplication(sys.argv)
     viewer = PolygonViewer(merged_pieces)

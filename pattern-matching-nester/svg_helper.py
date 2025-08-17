@@ -111,6 +111,35 @@ def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> list:
     return merged_pieces
 
 
+def reduce_seams(merged_pieces: list, seams: list) -> list:
+    seam_idx_to_keep = [1] * len(seams)
+    for piece in merged_pieces:
+        if "+" in piece.name:
+            part_names = piece.name.split("+")
+            if len(part_names) > 2:
+                raise NotImplementedError("More than 3 pieces merged into one")
+            part_1 = part_names[0]
+            part_2 = part_names[1]
+
+            for i, seam in enumerate(seams):
+                seam: Seam
+                if len(seam.seamparts) < 2:
+                    continue
+                if len(seam.seamparts) > 2:
+                    raise NotImplementedError("Seam with more than 3 parts")
+                seampart_names = [x.part for x in seam.seamparts]
+                if part_1 in seampart_names and part_2 in seampart_names:
+                    seam_idx_to_keep[i] = 0
+
+    reduced_seams = []
+    for i, seam in enumerate(seams):
+        if seam_idx_to_keep[i]:
+           reduced_seams.append(seam)
+
+    print("no of seams left: ", len(reduced_seams))
+    return reduced_seams
+
+
 def reindex(pieces: list) -> list:
     for index, piece in enumerate(pieces):
         piece.index = index
