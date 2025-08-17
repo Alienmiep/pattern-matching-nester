@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-from shapely import set_precision
+from shapely import set_precision, line_merge
 from shapely.geometry import Polygon, Point, LineString, MultiLineString
 from shapely.ops import nearest_points
 
@@ -16,6 +16,48 @@ class EdgePair:
     edge_b_index: int
     shared_vertex: Point
     edge_case: int
+
+
+def handle_intersection(intersection):
+    shared_points = []
+    line_intersection_flag = False
+    linestring_intersection_length = 0
+
+    if intersection.geom_type == "Point":
+        shared_points.append(intersection)
+
+    elif intersection.geom_type == "MultiPoint":
+        shared_points.extend(list(intersection.geoms))
+
+    elif intersection.geom_type in ["LineString", "MultiLineString"]:
+        line_intersection_flag = True
+        merged_linestring = line_merge(intersection)
+
+        if merged_linestring.geom_type == "LineString":
+            shared_points.append(Point(merged_linestring.coords[0]))
+            shared_points.append(Point(merged_linestring.coords[-1]))
+            linestring_intersection_length = merged_linestring.length
+
+        elif merged_linestring.geom_type == "MultiLineString":
+            for line in merged_linestring.geoms:
+                shared_points.append(Point(line.coords[0]))
+                shared_points.append(Point(line.coords[-1]))
+                linestring_intersection_length += line.length
+
+    elif intersection.geom_type in ["Polygon", "MultiPolygon"]:
+        raise Exception("Polygons seem to overlap")
+
+    elif intersection.geom_type == "GeometryCollection":
+        for geom in intersection.geoms:
+            sub_points, sub_flag, sub_length = handle_intersection(geom)
+            shared_points.extend(sub_points)
+            line_intersection_flag = line_intersection_flag or sub_flag
+            linestring_intersection_length += sub_length
+
+    else:
+        raise Exception(f"Unhandled intersection type: {intersection.geom_type}")
+
+    return shared_points, line_intersection_flag, linestring_intersection_length
 
 
 def incident_edges(polygon: Polygon, point: Point) -> list:
@@ -45,7 +87,6 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
             return 1
 
         # but! if the non-shared endpoint of one edge touches the middle of the other edge, the case actually depends on the shared_point we're looking at
-        print("handling more complex case")
         return 2 if endpoint in endpoints_b else 3
 
     inter = precision_aware_intersection(precise_edge_a, precise_edge_b)
@@ -56,7 +97,6 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
         return 3
 
     elif isinstance(inter, LineString):
-        print("complex case, but with more overlap")
         return 2 if (shared_point.x, shared_point.y) in endpoints_b else 3
 
     return 0
@@ -89,9 +129,25 @@ def is_left_or_right(edge_a_imprecise: LineString, edge_b_imprecise: LineString)
         return "parallel"
 
     # point A: non-touching point of edge_b
+    # --- Find point A (non-touching point of edge_b) ---
+    tol = 1e-6  # tolerance for "same point"
+    a_coords = list(edge_a.coords)
+    b_coords = list(edge_b.coords)
+
+    # Check if either endpoint of edge_b matches an endpoint of edge_a (within tolerance)
+    matches = [any(Point(b).distance(Point(a)) < tol for a in a_coords) for b in b_coords]
+
+    if any(matches):
+        # pick the non-matching endpoint of edge_b
+        point_a = b_coords[0] if not matches[0] else b_coords[1]
+    else:
+        # No match → imprecise case → pick endpoint farther from edge_a start
+        start_a = Point(a_coords[0])
+        dist0 = start_a.distance(Point(b_coords[0]))
+        dist1 = start_a.distance(Point(b_coords[1]))
+        point_a = b_coords[0] if dist0 > dist1 else b_coords[1]
     # point B: start of edge_a
     # point C: end of edge_a
-    point_a = edge_b.coords[0] if edge_b.coords[0] not in list(edge_a.coords) else edge_b.coords[1]
     point_b = edge_a.coords[0]
     point_c = edge_a.coords[1]
     angle = angle_from_points(point_a, point_b, point_c)
@@ -349,3 +405,14 @@ def find_edge_index(poly_edges: list, edge: LineString) -> int:
         if e.equals(edge):
             return i
     raise Exception("Cannot find specified edge in polygon")
+
+
+def longest_vector(vectors: list) -> tuple:
+    max_length = 0
+    longest_index = 0
+    for index, v in enumerate(vectors):
+        length = math.hypot(v[0], v[1])
+        if length > max_length:
+            max_length = length
+            longest_index = index
+    return longest_index, vectors[longest_index]

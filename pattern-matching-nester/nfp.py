@@ -11,7 +11,7 @@ a_poly_local = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-cl
 b_poly_untranslated_local = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
 
 def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> Polygon:
-    a_poly = orient_polygons(a_poly_raw)
+    a_poly = orient_polygons(set_precision(a_poly_raw, INTERSECTION_PRECISION))
     a_poly_edges = helper.get_edges(a_poly)
     # 1. setup
     # TODO more advanced version where you give a reference point and then try to find a touching, non-intersecting position for b_poly
@@ -40,26 +40,9 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         if intersection.is_empty:
             raise Exception("Polygons are not touching")
 
-        if intersection.geom_type == "Point":
-            shared_points = [intersection]
-        elif intersection.geom_type == "MultiPoint":
-            shared_points = list(intersection.geoms)
-        elif intersection.geom_type in ["LineString", "MultiLineString"]:
-            line_intersection_flag = True
-            merged_linestring = line_merge(intersection)
-            if merged_linestring.geom_type == "LineString":
-                shared_points = [Point(merged_linestring.coords[0]), Point(merged_linestring.coords[-1])]
-                linestring_intersection_length = merged_linestring.length
-            elif merged_linestring.geom_type == "MultiLineString":
-                linestring_intersection_length = 0
-                for line in merged_linestring.geoms:
-                    shared_points.append(Point(line.coords[0]))
-                    shared_points.append(Point(line.coords[-1]))
-        elif intersection.geom_type in ('Polygon', 'MultiPolygon'):
-            raise Exception("Polygons seem to overlap")
-            # TODO see how this reacts to touching along an edge
-        else:
-            raise Exception(f"Unhandled intersection type: {intersection.geom_type}")
+        print(intersection)
+
+        shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
 
         # 2. orbiting
         # 2a) detection of touching edges
@@ -171,6 +154,11 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                 if not actually_feasible_vectors:
                     raise Exception("No feasible translation vectors left after intersection (or lack thereof) check")
             else:
+                if intersection.geom_type in ["MultiPoint", "MultiLineString", "GeometryCollection"]:
+                    index, longest_vector = helper.longest_vector(feasible_translation_vectors)
+                    actually_feasible_vectors.append(longest_vector)
+                    actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+                    break
                 for index, candidate in enumerate(feasible_translation_vectors):
                     translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
                     angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
