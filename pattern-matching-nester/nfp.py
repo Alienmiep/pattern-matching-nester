@@ -1,11 +1,11 @@
 from itertools import product
 
-from shapely import set_precision, orient_polygons, line_merge
-from shapely.geometry import Polygon, Point
+from shapely import set_precision, orient_polygons
+from shapely.geometry import Polygon
 from shapely.affinity import translate
 
 import helper as helper
-from helper import EdgePair, INTERSECTION_PRECISION
+from helper import EdgePair, INTERSECTION_PRECISION, NO_OF_ROUNDING_DIGITS
 
 a_poly_local = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 b_poly_untranslated_local = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
@@ -158,7 +158,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                     index, longest_vector = helper.longest_vector(feasible_translation_vectors)
                     actually_feasible_vectors.append(longest_vector)
                     actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
-                    break
+                else:
                 for index, candidate in enumerate(feasible_translation_vectors):
                     translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
                     angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
@@ -195,7 +195,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         b_poly_imprecise = translate(b_poly, xoff=trimmed_translation_vector[0], yoff=trimmed_translation_vector[1])
         b_poly = orient_polygons(set_precision(b_poly_imprecise, INTERSECTION_PRECISION))
         b_poly_edges = helper.get_edges(b_poly)
-        nfp.append((nfp[-1][0] + trimmed_translation_vector[0], nfp[-1][1] + trimmed_translation_vector[1]))
+        nfp.append((round(nfp[-1][0] + trimmed_translation_vector[0], NO_OF_ROUNDING_DIGITS), round(nfp[-1][1] + trimmed_translation_vector[1], NO_OF_ROUNDING_DIGITS)))
         nfp_edges.append(untrimmed_translation_edge)
 
         print("NFP: ", nfp)
@@ -204,8 +204,17 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         if len(nfp) > 100:  # safety mechanism
             nfp_is_closed_loop = True
 
+    is_valid = False
+    while not is_valid:
+        if not nfp:
+            break
+        try:
     unsnapped_nfp = Polygon(nfp)
     snapped_nfp = set_precision(unsnapped_nfp, INTERSECTION_PRECISION)
+            is_valid = True
+        except Exception:
+            vertex = nfp.pop()
+            print(f"Removed vertex {vertex}")
     return snapped_nfp
 
 

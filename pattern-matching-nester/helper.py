@@ -317,7 +317,7 @@ def find_closest_intersection(start: tuple, geometry_collection) -> tuple | None
     return (closest_point.x, closest_point.y)
 
 
-def is_closed_loop(nfp, tol=1e-8):
+def is_closed_loop(nfp, tol=0.2):
     if len(nfp) < 3:
         return False
     start = Point(nfp[0])
