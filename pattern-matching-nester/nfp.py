@@ -159,12 +159,12 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                     actually_feasible_vectors.append(longest_vector)
                     actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
                 else:
-                for index, candidate in enumerate(feasible_translation_vectors):
-                    translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
-                    angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
-                    if angle != 90.0 and angle != 270.0:
-                        actually_feasible_vectors.append(candidate)
-                        actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+                    for index, candidate in enumerate(feasible_translation_vectors):
+                        translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
+                        angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
+                        if angle != 90.0 and angle != 270.0:
+                            actually_feasible_vectors.append(candidate)
+                            actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
                 if len(actually_feasible_vectors) > 1:
                     raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
                 if not actually_feasible_vectors:
@@ -209,8 +209,8 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         if not nfp:
             break
         try:
-    unsnapped_nfp = Polygon(nfp)
-    snapped_nfp = set_precision(unsnapped_nfp, INTERSECTION_PRECISION)
+            unsnapped_nfp = Polygon(nfp)
+            snapped_nfp = set_precision(unsnapped_nfp, INTERSECTION_PRECISION)
             is_valid = True
         except Exception:
             vertex = nfp.pop()
