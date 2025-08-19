@@ -22,6 +22,7 @@ class Seampart:
 class Seam:
     id: int
     seamparts: list
+    matchable: bool = False
 
 # helpers for merging
 

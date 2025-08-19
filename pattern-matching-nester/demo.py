@@ -124,6 +124,21 @@ def simple_nfp(static_poly: Polygon, orbiting_poly: Polygon, reference_point: tu
     return static_poly
 
 
+def get_shared_seams_with_placed_pieces(current_piece: Piece, placed_pieces: list) -> list:
+    affected_seams = []
+    if placed_pieces:
+        for placed_piece in placed_pieces:
+            affected_seams.extend(full_pattern.find_seams_by_pair(current_piece.name, placed_piece.name))
+        print(f"Found {len(affected_seams)} affected seam(s)")
+    return affected_seams
+
+# seams between the first two parts:
+# [Seam(id=9, seamparts=[Seampart(part='left_ftorso', start=(17.0, 1.6751059804269488), end=(7.499999999999997, 0.0)), Seampart(part='left_btorso', start=(7.499999999999995, 0.0), end=(17.0, 1.6751068138012997))]),
+#  Seam(id=10, seamparts=[Seampart(part='left_ftorso', start=(25.0, 44.204087141094675), end=(25.0, 21.69877899971849)), Seampart(part='left_btorso', start=(20.0, 21.698779833092836), end=(20.0, 44.20408749919405))]),
+#  Seam(id=19, seamparts=[Seampart(part='right_ftorso', start=(17.500000000000004, 0.0), end=(8.0, 1.6751059804269488)), Seampart(part='right_btorso', start=(3.0, 1.6751068138012997), end=(12.500000000000005, 0.0))]),
+#  Seam(id=20, seamparts=[Seampart(part='right_ftorso', start=(0.0, 21.69877899971849), end=(0.0, 44.204087141094675)), Seampart(part='right_btorso', start=(0.0, 44.20408749919405), end=(0.0, 21.698779833092836))])]
+
+
 class PathItem(QGraphicsPathItem):
     def __init__(self, path: QPainterPath, attributes: dict, element=None, viewer=None):
         super().__init__(path)
@@ -325,6 +340,23 @@ class PolygonViewer(QMainWindow):
         if not self.placed_pieces:
             self.fit_first_piece()
             return
+
+        # see if the current piece shares any seams with previously placed pieces
+        # prioritize matchable seams
+        # select first seam, get 2 reference point pairs from it
+        # test both for viability (throw error if neither of them are AND we have a matchable seam)
+        # if there are no viable ones, find a different vertex on placed piece
+        # reference points are relative to the NFP and one piece can have multiple for the different NFPs
+
+        affected_seams = get_shared_seams_with_placed_pieces(self.current_piece, self.placed_pieces)
+        if any([x.matchable for x in affected_seams]):
+            # TODO get first matchable seam
+            pass
+        else:
+            current_seam = affected_seams[0]
+
+        # problem: piece with a +, but seam without a + >->
+
 
         reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
         main_polygon = Polygon(self.shapes["ifp"])
