@@ -182,18 +182,21 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     shared_vertex = (pair.shared_vertex.x, pair.shared_vertex.y)
     translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
     translation_vector_linestring = LineString([shared_vertex, translation_vector_endpoint])
+    # print(translation_vector_linestring)
 
     match pair.edge_case:
         case 1:
             # the allowed range is the side of a that b is on, union with the side of b that a is not on
             # borders (="parallel") are allowed too
-            if pair.edge_a_index == 3:
-                pass
             allowed_side_a = is_left_or_right(pair.edge_a, pair.edge_b)
             allowed_side_b = is_left_or_right(pair.edge_b, pair.edge_a)
             location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
             location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
+            # print(allowed_side_a, allowed_side_b)
+            # print(location_a, location_b)
+            # print(translation_vector_endpoint)
             if allowed_side_a == "parallel" and allowed_side_b == "parallel":
+                # print("True due to both being parallel")
                 return True
 
             negated_side_b = "right" if allowed_side_b == "left" else "left"
@@ -201,26 +204,33 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
         case 2:
             # side of a that b is on, but only use the part of a betweeen shared_vertex and its end
             trimmed_a = LineString([shared_vertex, (pair.edge_a.coords[1])])
+            # print(trimmed_a)
             if trimmed_a.length < INTERSECTION_PRECISION:
+                # print("True due to length")
                 return True
 
             allowed_side_a = is_left_or_right(trimmed_a, pair.edge_b)
             if allowed_side_a == "parallel":  # in cases 2 and 3 that means the two edges are laying on top of each other
+                # print("True due to being parallel")
                 return True
 
             location_a = is_left_or_right(trimmed_a, translation_vector_linestring)
+            # print(allowed_side_a, location_a)
             return location_a in [allowed_side_a, "parallel"]
         case 3:
             # side of b that a is not on, but only use the part of b betweeen shared_vertex and its end
             trimmed_b = LineString([shared_vertex, (pair.edge_b.coords[1])])
             if trimmed_b.length < INTERSECTION_PRECISION:
+                # print("True due to length")
                 return True
 
             disallowed_side_b = is_left_or_right(trimmed_b, pair.edge_a)
             if disallowed_side_b == "parallel":
+                # print("True due to being parallel")
                 return True
 
             location_b = is_left_or_right(trimmed_b, translation_vector_linestring)
+            # print(disallowed_side_b, location_b)
             return location_b != disallowed_side_b
 
 

@@ -40,7 +40,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         if intersection.is_empty:
             raise Exception("Polygons are not touching")
 
-        print(intersection)
+        # print(intersection)
 
         shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
 
@@ -57,7 +57,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
             edges_poly_b = helper.incident_edges(b_poly, shared_point)
             combinations[shared_point] = list(product(edges_poly_a, edges_poly_b))
 
-        print("identified edge pair combinations: ", combinations)
+        # print("identified edge pair combinations: ", combinations)
 
         # these edge pairs can fall into three different cases:
         # (1) both touch in a vertex (like a V)
@@ -100,12 +100,12 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                 potential_translation_vectors.append(translation)
                 potential_translation_vectors_edges.append(edge)
 
-        print("potential translation vectors: ", potential_translation_vectors)
-        print("edges used to generate them: ", potential_translation_vectors_edges)
+        # print("potential translation vectors: ", potential_translation_vectors)
+        # print("edges used to generate them: ", potential_translation_vectors_edges)
 
         potential_translation_vectors , potential_translation_vectors_edges= helper.filter_redundant_vectors(potential_translation_vectors, potential_translation_vectors_edges)
-        print("potential translation vectors after filtering redundancies: ", potential_translation_vectors)
-        print("edges used to generate them: ", potential_translation_vectors_edges)
+        # print("potential translation vectors after filtering redundancies: ", potential_translation_vectors)
+        # print("edges used to generate them: ", potential_translation_vectors_edges)
 
         # 2c) find feasible translation
         # choose a translation vector that doesn't immediately cause an intersection :)
@@ -119,16 +119,21 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         feasible_translation_vectors = []
         feasible_translation_vectors_edges = []
         for index, translation_vector in enumerate(potential_translation_vectors):
+            # print("+++++++++++++++++++++++")
+            # print(translation_vector)
+            # print("+++++++++++++++++++++++")
             is_feasible = True
             for pair in touching_pairs:
+                # print(pair)
                 is_feasible = is_feasible and helper.is_in_feasible_range(translation_vector, pair)  # stops checking once an edge has been found not feasible
+                # print(is_feasible)
             if is_feasible:
                 feasible_translation_vectors.append(translation_vector)
                 feasible_translation_vectors_edges.append(potential_translation_vectors_edges[index])
 
-        print("feasible translation vectors: ", feasible_translation_vectors)
-        print("edges used to generate them: ", feasible_translation_vectors_edges)
-        print("NFP edges so far:", nfp_edges)
+        # print("feasible translation vectors: ", feasible_translation_vectors)
+        # print("edges used to generate them: ", feasible_translation_vectors_edges)
+        # print("NFP edges so far:", nfp_edges, len(nfp_edges))
         if line_intersection_flag and linestring_intersection_length:
             # cap the length of the translation vector to the length of the intersection
             feasible_translation_vectors = helper.cap_translation_vectors(feasible_translation_vectors, linestring_intersection_length)
@@ -159,24 +164,24 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                     actually_feasible_vectors.append(longest_vector)
                     actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
                 else:
-                for index, candidate in enumerate(feasible_translation_vectors):
-                    translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
-                    angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
-                    if angle != 90.0 and angle != 270.0:
-                        actually_feasible_vectors.append(candidate)
-                        actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
-                if len(actually_feasible_vectors) > 1:
-                    raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
-                if not actually_feasible_vectors:
-                    raise Exception("No feasible translation vectors left after 90° check")
+                    for index, candidate in enumerate(feasible_translation_vectors):
+                        translation_vector_endpoint = (intersection.coords[1][0] + candidate[0], intersection.coords[1][1] + candidate[1])
+                        angle = helper.angle_from_points(intersection.coords[0], intersection.coords[1], translation_vector_endpoint)
+                        if angle != 90.0 and angle != 270.0:
+                            actually_feasible_vectors.append(candidate)
+                            actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
+                    if len(actually_feasible_vectors) > 1:
+                        raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
+                    if not actually_feasible_vectors:
+                        raise Exception("No feasible translation vectors left after 90° check")
             untrimmed_translation = actually_feasible_vectors[0]
             untrimmed_translation_edge = actually_feasible_vectors_edges[0]
         else:
             untrimmed_translation = feasible_translation_vectors[0]
             untrimmed_translation_edge = feasible_translation_vectors_edges[0]
 
-        print("decided on translation vector: ", untrimmed_translation)
-        print("made from edge: ", untrimmed_translation_edge)
+        # print("decided on translation vector: ", untrimmed_translation)
+        # print("made from edge: ", untrimmed_translation_edge)
 
         # 2d) trim feasible translation
         # for all points of B, apply the translation and see if (and where) it intersects
@@ -186,7 +191,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
 
         trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points, intersection)
         trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, intersection, reverse=True)
-        print("trimmed translation vector: ", trimmed_translation_vector)
+        # print("trimmed translation vector: ", trimmed_translation_vector)
 
         if trimmed_translation_vector[0] == 0 and trimmed_translation_vector[1] == 0:
             raise Exception("Translation vector (0,0) is not allowed")
@@ -198,7 +203,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         nfp.append((round(nfp[-1][0] + trimmed_translation_vector[0], NO_OF_ROUNDING_DIGITS), round(nfp[-1][1] + trimmed_translation_vector[1], NO_OF_ROUNDING_DIGITS)))
         nfp_edges.append(untrimmed_translation_edge)
 
-        print("NFP: ", nfp)
+        # print("NFP: ", nfp)
         nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
         if len(nfp) > 100:  # safety mechanism
@@ -209,8 +214,8 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         if not nfp:
             break
         try:
-    unsnapped_nfp = Polygon(nfp)
-    snapped_nfp = set_precision(unsnapped_nfp, INTERSECTION_PRECISION)
+            unsnapped_nfp = Polygon(nfp)
+            snapped_nfp = set_precision(unsnapped_nfp, INTERSECTION_PRECISION)
             is_valid = True
         except Exception:
             vertex = nfp.pop()
