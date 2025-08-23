@@ -8,27 +8,37 @@ class Piece():
         self.index = index
         self.name = name
         self.path = path
-        self.vertices = self.__extract_vertices(unit_scale)
+        self.original_vertices, self.vertices, self.vertex_mapping = self.__extract_vertices(unit_scale)
         self.aabb = None
+        self.reference_point = None
 
     def __str__(self):
-        return f"Index: {self.index}, Vertices: {self.vertices}"
+        return f"Index: {self.index}, Vertices: {self.vertices}, original Vertices: {self.original_vertices}"
 
-    def __extract_vertices(self, unit_scale, base_resolution=3.0, min_samples=3, max_samples=20) -> list:
+    def __extract_vertices(self, unit_scale, base_resolution=3.0, min_samples=3, max_samples=20) -> tuple:
         """
-        Converts a Path into a list of (x, y) vertices.
-        - base_resolution: target spacing between points (in cm)
-        - min_samples / max_samples: limits on sampling granularity
+        Converts a Path into:
+        - original_vertices: anchor points from the SVG path
+        - vertices: full polygon with sampled points
+        - vertex_mapping: mapping {original_index: [polygon_indices]}
+
+        base_resolution: target spacing between points (in cm)
+        min_samples / max_samples: limits on sampling granularity
         """
         vertices = []
-        if not self.path:
-            return vertices
+        original_vertices = []
+        vertex_mapping = {}
 
-        for segment in self.path:
+        if not self.path:
+            return original_vertices, vertices, vertex_mapping
+
+        poly_index = 0  # running index into polygon vertices
+
+        for orig_idx, segment in enumerate(self.path):
             segment_type = type(segment)
             segment_length = segment.length(error=1e-4)
             if segment_length == 0:
-                continue  # avoid division by zero :^)
+                continue
 
             num_samples = max(min_samples, min(int(segment_length / base_resolution), max_samples))
 
@@ -39,13 +49,19 @@ class Piece():
             else:
                 raise NotImplementedError(f"Unhandled segment type: {segment_type}")
 
-            for pt in points:
+            for i, pt in enumerate(points):
                 x = float(round(pt.real * unit_scale, COORDINATE_DECIMAL_PLACES))
                 y = float(round(-pt.imag * unit_scale, COORDINATE_DECIMAL_PLACES))
                 if (x, y) not in vertices:
-                    vertices.append((x, y))  # avoid duplicate points
+                    vertices.append((x, y))
 
-        return vertices  # do not reverse order of vertices, that is done at the start of NFP
+                    # if this is the *start* of the first segment, or the *end* of any segment,
+                    # treat it as an original anchor
+                    if (i == 0 and orig_idx == 0) or i == len(points) - 1:
+                        original_vertices.append((x, y))
+                        vertex_mapping[len(original_vertices) - 1] = len(vertices) - 1
+
+        return original_vertices, vertices, vertex_mapping  # NFP algorithm ensures vertices are in the right order (counter-clockwise)
 
     def area(self):
         polygon = Polygon(self.vertices)

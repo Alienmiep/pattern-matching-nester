@@ -15,11 +15,13 @@ from models.pattern import Pattern
 from svg_helper import *
 from ifp import ifp
 from nfp import nfp
-from helper import INTERSECTION_PRECISION
+from helper import INTERSECTION_PRECISION, vector_from_points, precision_aware_intersection, handle_intersection
+from shapely.affinity import translate
+
 
 # "pattern profile"
 SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
-MERGE_PIECES = True
+MERGE_PIECES = True  # TODO ensure piece names are read even when not merging
 MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
 
@@ -137,6 +139,39 @@ def get_shared_seams_with_placed_pieces(current_piece: Piece, placed_pieces: lis
 #  Seam(id=10, seamparts=[Seampart(part='left_ftorso', start=(25.0, 44.204087141094675), end=(25.0, 21.69877899971849)), Seampart(part='left_btorso', start=(20.0, 21.698779833092836), end=(20.0, 44.20408749919405))]),
 #  Seam(id=19, seamparts=[Seampart(part='right_ftorso', start=(17.500000000000004, 0.0), end=(8.0, 1.6751059804269488)), Seampart(part='right_btorso', start=(3.0, 1.6751068138012997), end=(12.500000000000005, 0.0))]),
 #  Seam(id=20, seamparts=[Seampart(part='right_ftorso', start=(0.0, 21.69877899971849), end=(0.0, 44.204087141094675)), Seampart(part='right_btorso', start=(0.0, 44.20408749919405), end=(0.0, 21.698779833092836))])]
+
+
+def select_reference_point(rp_candidates: list, current_piece: Piece, placed_pieces: list) -> tuple:
+    # idea: assume the first candidate (start of seam)
+    # check if a valid starting position can be found for each already placed piece
+    # if not, try again for the other candidate
+    # and if that one *also* doesn't work somehow, return an error so the program can try again with a different seam
+    for candidate in rp_candidates:
+        candidate_is_valid = True
+        for piece in placed_pieces:
+            candidate_is_valid = candidate_is_valid and bool(find_valid_starting_position(candidate, current_piece, piece))
+        if candidate_is_valid:
+            return candidate
+    raise NotImplementedError("Neither of the reference point candidates are valid")
+
+
+def find_valid_starting_position(candidate: tuple, current_piece: Piece, piece: Piece) -> tuple:
+    current_piece_polygon = Polygon(current_piece.vertices)
+    piece_polygon = Polygon(piece.vertices)
+    for vertex in piece.vertices:
+        translation = vector_from_points(candidate, vertex)
+        translated_current_piece = translate(current_piece_polygon, xoff=translation[0], yoff=translation[1])
+        intersection = precision_aware_intersection(translated_current_piece, piece_polygon)
+        try:
+            _ = handle_intersection(intersection)
+            print(f"Found valid starting position {vertex}")
+            return vertex
+        except Exception:
+            # print(f"Vertex {vertex} does not work due to intersection {intersection}")
+            pass
+
+    return None
+
 
 
 class PathItem(QGraphicsPathItem):
@@ -355,7 +390,12 @@ class PolygonViewer(QMainWindow):
         else:
             current_seam = affected_seams[0]
 
-        # problem: piece with a +, but seam without a + >->
+        # goal here: select a good reference point on the current (= orbiting) piece
+        seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
+        reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
+        self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
+        print(self.current_piece.reference_point)
+
 
 
         reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
@@ -401,17 +441,27 @@ if __name__ == '__main__':
         piece = Piece(index, name, path, unit_scale)
         pieces.append(piece)
 
-    seams = parse_svg_metadata(SVG_FILE)
-    for seam in seams:
-        print(f"Seam ID: {seam.id}")
-        for part in seam.seamparts:
-            print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}")
+    # for p in pieces:
+    #     print(p)
 
-    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
+    seams_raw = parse_svg_metadata(SVG_FILE)
+    seams = correct_vertex_indices(seams_raw, pieces)
+    # for seam in seams:
+    #     print(f"Seam ID: {seam.id}")
+    #     for part in seam.seamparts:
+    #         print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}")
+
+    if MERGE_PIECES:
+        unindexed_merged_pieces, index_mappings, merged_names = merge_pieces_with_common_vertices(pieces, unit_scale)
+        merged_pieces = reindex(unindexed_merged_pieces)
+        reduced_seams = reduce_seams(merged_pieces, seams)
+        final_seams = remap_seams(reduced_seams, index_mappings, merged_names)
+    else:
+        merged_pieces = pieces
+        final_seams = seams
+
     merged_pieces.sort(key=lambda p: p.area(), reverse=True)
-    reduced_seams = reduce_seams(merged_pieces, seams) if MERGE_PIECES else seams
-
-    full_pattern = Pattern(merged_pieces, reduced_seams)
+    full_pattern = Pattern(merged_pieces, final_seams)
 
     app = QApplication(sys.argv)
     viewer = PolygonViewer(merged_pieces)
