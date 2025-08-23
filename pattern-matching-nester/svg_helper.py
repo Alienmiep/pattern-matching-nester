@@ -94,22 +94,99 @@ def combine_paths(path1: Path, path2: Path) -> Path:
     return Path(*reordered)
 
 
-def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> list:
+def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> tuple:
+    # TODO adjust the vertex indices stored in the seams as well...
     merged_pieces = []
+    index_mappings = {}   # {old_piece_name: {old_index: new_index}}
+    merged_names = {}     # {old_piece_name: new_piece_name}
+
     while pieces:
-        # print([str(x) for x in merged_pieces])
         piece = pieces.pop(0)
         match_found = False
         for p in pieces:
-            merged_vertex_set = set(piece.vertices + p.vertices)
-            if len(merged_vertex_set) <= len(piece.vertices) + len(p.vertices) - 2:  # share at least 2 vertices
+            merged_vertex_list = list(dict.fromkeys(piece.vertices + p.vertices))
+            # preserve order, remove duplicates
+
+            if len(merged_vertex_list) <= len(piece.vertices) + len(p.vertices) - 2:
                 match_found = True
-                pieces.remove(p)  # <- allows for only one match, so only 2 pieces can be merged together
+                pieces.remove(p)
+
                 new_path = combine_paths(piece.path, p.path)
-                merged_pieces.append(Piece(-1,f"{piece.name}+{p.name}", new_path, unit_scale))
+                new_name = f"{piece.name}+{p.name}"
+                new_piece = Piece(-1, new_name, new_path, unit_scale)
+
+                # Build index mappings
+                mapping_piece = {i: new_piece.vertices.index(v) for i, v in enumerate(piece.vertices)}
+                mapping_p     = {i: new_piece.vertices.index(v) for i, v in enumerate(p.vertices)}
+
+                index_mappings[piece.name] = mapping_piece
+                index_mappings[p.name] = mapping_p
+                merged_names[piece.name] = new_name
+                merged_names[p.name] = new_name
+
+                merged_pieces.append(new_piece)
+
         if not match_found:
             merged_pieces.append(piece)
-    return merged_pieces
+
+    return merged_pieces, index_mappings, merged_names
+
+
+def remap_seams(seams: list, index_mappings: dict, merged_names: dict) -> list:
+    updated_seams = []
+
+    for seam in seams:
+        new_seamparts = []
+        for sp in seam.seamparts:
+            if sp.part in index_mappings:
+                mapping = index_mappings[sp.part]
+                new_start = mapping.get(sp.start, sp.start)
+                new_end   = mapping.get(sp.end, sp.end)
+                new_part_name = merged_names.get(sp.part, sp.part)
+                new_seamparts.append(
+                    Seampart(new_part_name, new_start, new_end)
+                )
+            else:
+                new_seamparts.append(sp)
+        updated_seams.append(Seam(seam.id, new_seamparts, seam.matchable))
+    return updated_seams
+
+
+def correct_vertex_indices(seams: list, pieces: list) -> list:
+    """
+    Rewrite seam vertex indices so they point into the polygon vertices
+    (Piece.vertices) instead of original SVG indices.
+    """
+    # Build quick lookup by piece name
+    piece_lookup = {p.name: p for p in pieces}
+    corrected_seams = []
+
+    for seam in seams:
+        new_seamparts = []
+        for sp in seam.seamparts:
+            if sp.part not in piece_lookup:
+                # seam references a missing piece -> leave unchanged
+                new_seamparts.append(sp)
+                continue
+
+            piece = piece_lookup[sp.part]
+
+            # Map original indices to polygon indices
+            start_new = piece.vertex_mapping.get(sp.start, sp.start)
+            end_new   = piece.vertex_mapping.get(sp.end, sp.end)
+
+            new_sp = Seampart(
+                part=sp.part,
+                start=start_new,
+                end=end_new
+            )
+            new_seamparts.append(new_sp)
+
+        corrected_seams.append(
+            Seam(seam.id, new_seamparts, seam.matchable)
+        )
+
+    return corrected_seams
 
 
 def reduce_seams(merged_pieces: list, seams: list) -> list:
@@ -377,8 +454,8 @@ def parse_svg_metadata(svg_path: str) -> list:
 
         for part_elem in seam_elem.findall(f'{ns}seampart'):
             part = part_elem.find(f'{ns}part').text
-            start = parse_coord(part_elem.find(f'{ns}start').text)
-            end = parse_coord(part_elem.find(f'{ns}end').text)
+            start = int(part_elem.find(f'{ns}start').text)
+            end = int(part_elem.find(f'{ns}end').text)
             # direction = part_elem.find(f'{ns}direction').text.lower() == 'true'  # :/
             seamparts.append(Seampart(part, start, end))
 
