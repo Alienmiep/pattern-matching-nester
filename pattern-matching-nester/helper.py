@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from shapely import set_precision, line_merge
 from shapely.geometry import Polygon, Point, LineString, MultiLineString
 from shapely.ops import nearest_points
+from shapely.affinity import translate
+
+from models.piece import Piece
 
 INTERSECTION_PRECISION = 0.01
 NO_OF_ROUNDING_DIGITS = 2
@@ -16,6 +19,29 @@ class EdgePair:
     edge_b_index: int
     shared_vertex: Point
     edge_case: int
+
+def find_valid_starting_position(candidate: tuple, current_piece: Piece, piece: Piece) -> tuple:
+    current_piece_polygon = Polygon(current_piece.vertices)
+    piece_polygon = Polygon(piece.vertices)
+
+    print("stationary piece", list(piece_polygon.exterior.coords))
+    # print(candidate)
+    for vertex in piece.vertices:
+        translation = vector_from_points(candidate, vertex)
+        print("translation", translation)
+        print("from:", candidate, vertex)
+        translated_current_piece = translate(current_piece_polygon, xoff=translation[0], yoff=translation[1])
+        print("translated current piece", list(translated_current_piece.exterior.coords))
+        intersection = precision_aware_intersection(translated_current_piece, piece_polygon)
+        try:
+            _ = handle_intersection(intersection)
+            print(f"Found valid starting position {vertex}")
+            return vertex
+        except Exception:
+            print(f"Vertex {vertex} does not work due to intersection {intersection}")
+            pass
+
+    return None
 
 
 def handle_intersection(intersection):

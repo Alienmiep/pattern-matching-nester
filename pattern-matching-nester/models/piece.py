@@ -10,7 +10,15 @@ class Piece():
         self.path = path
         self.original_vertices, self.vertices, self.vertex_mapping = self.__extract_vertices(unit_scale)
         self.aabb = None
-        self.reference_point = None
+        self.reference_point_index = None
+
+    @property
+    def reference_point(self):
+        return self.vertices[self.reference_point_index]
+
+    @reference_point.setter
+    def reference_point(self, value):
+        self.reference_point_index = self.vertices.index(value)
 
     def __str__(self):
         return f"Index: {self.index}, Vertices: {self.vertices}, original Vertices: {self.original_vertices}"
@@ -31,8 +39,6 @@ class Piece():
 
         if not self.path:
             return original_vertices, vertices, vertex_mapping
-
-        poly_index = 0  # running index into polygon vertices
 
         for orig_idx, segment in enumerate(self.path):
             segment_type = type(segment)

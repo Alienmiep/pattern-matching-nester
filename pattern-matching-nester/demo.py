@@ -15,8 +15,7 @@ from models.pattern import Pattern
 from svg_helper import *
 from ifp import ifp
 from nfp import nfp
-from helper import INTERSECTION_PRECISION, vector_from_points, precision_aware_intersection, handle_intersection
-from shapely.affinity import translate
+from helper import INTERSECTION_PRECISION, find_valid_starting_position
 
 
 # "pattern profile"
@@ -153,25 +152,6 @@ def select_reference_point(rp_candidates: list, current_piece: Piece, placed_pie
         if candidate_is_valid:
             return candidate
     raise NotImplementedError("Neither of the reference point candidates are valid")
-
-
-def find_valid_starting_position(candidate: tuple, current_piece: Piece, piece: Piece) -> tuple:
-    current_piece_polygon = Polygon(current_piece.vertices)
-    piece_polygon = Polygon(piece.vertices)
-    for vertex in piece.vertices:
-        translation = vector_from_points(candidate, vertex)
-        translated_current_piece = translate(current_piece_polygon, xoff=translation[0], yoff=translation[1])
-        intersection = precision_aware_intersection(translated_current_piece, piece_polygon)
-        try:
-            _ = handle_intersection(intersection)
-            print(f"Found valid starting position {vertex}")
-            return vertex
-        except Exception:
-            # print(f"Vertex {vertex} does not work due to intersection {intersection}")
-            pass
-
-    return None
-
 
 
 class PathItem(QGraphicsPathItem):
@@ -394,17 +374,16 @@ class PolygonViewer(QMainWindow):
         seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
         reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
         self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
-        print(self.current_piece.reference_point)
+        print("current piece vertices", self.current_piece.vertices)
+        print("current piece reference point", self.current_piece.reference_point)
 
-
-
-        reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
+        # reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
         main_polygon = Polygon(self.shapes["ifp"])
-        polygons_to_subtract = [Polygon(x.vertices) for x in self.placed_pieces]
+        # polygons_to_subtract = [Polygon(x.vertices) for x in self.placed_pieces]
 
         result = main_polygon
-        for index, poly in enumerate(polygons_to_subtract):
-            nfp_poly = nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
+        for index, p in enumerate(self.placed_pieces):
+            nfp_poly = nfp(p, self.current_piece, self.current_piece.reference_point)  # b_poly used to be Polygon(self.current_piece_vertices_calc)
             self.shapes[f"nfp_{index}"] = list(nfp_poly.exterior.coords)
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
             result_imprecise = result.difference(nfp_poly)
@@ -420,7 +399,7 @@ class PolygonViewer(QMainWindow):
             coords = list(result.exterior.coords)[:-1]
             target_point = min(coords, key=lambda p: (p[0], p[1]))
 
-        translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
+        translation = (target_point[0] - self.current_piece.reference_point[0], target_point[1] - self.current_piece.reference_point[1])
         self.translate_current_piece(translation)
         self.placed_pieces.append(self.current_piece)
         self.draw_everything()
