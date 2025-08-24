@@ -297,7 +297,9 @@ class PolygonViewer(QMainWindow):
         self.current_piece: Piece = self.pieces.pop(0)
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.vertices
-        self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
+        if not self.placed_pieces:
+            self.current_piece.reference_point = min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))
+            self.points_of_interest = [self.current_piece.reference_point]
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
 
@@ -335,7 +337,7 @@ class PolygonViewer(QMainWindow):
         self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
 
     def show_ifp(self) -> None:
-        ifp_vertices = ifp(self.current_piece_vertices_calc, fabric_vertices)
+        ifp_vertices = ifp(self.current_piece, fabric_vertices)
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
@@ -370,6 +372,7 @@ class PolygonViewer(QMainWindow):
         else:
             current_seam = affected_seams[0]
 
+        # TODO move this to before the IFP is created (for all pieces, not just the second and beyond)
         # goal here: select a good reference point on the current (= orbiting) piece
         seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
         reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
