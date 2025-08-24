@@ -6,32 +6,35 @@ from shapely.affinity import translate
 
 import helper as helper
 from helper import EdgePair, INTERSECTION_PRECISION, NO_OF_ROUNDING_DIGITS
+from models.piece import Piece
 
 a_poly_local = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 b_poly_untranslated_local = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
 
-def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> Polygon:
-    a_poly = orient_polygons(set_precision(a_poly_raw, INTERSECTION_PRECISION))
+def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
+    # a is the stationary = placed piece
+    a_poly = orient_polygons(set_precision(Polygon(a_piece.vertices), INTERSECTION_PRECISION))
     a_poly_edges = helper.get_edges(a_poly)
-    # 1. setup
-    # TODO more advanced version where you give a reference point and then try to find a touching, non-intersecting position for b_poly
-    # find lowest y point of A pt_a_ymin
-    pt_a_ymin = min(a_poly.exterior.coords, key=lambda p: p[1])
-    nfp = [pt_a_ymin]
-    nfp_edges = []
 
-    # find highest y point of B pt_b_ymax
-    pt_b_ymax = max(b_poly_untranslated.exterior.coords, key=lambda p: p[1])
+    # 1. setup
+    a_poly_starting_point = helper.find_valid_starting_position(reference_point, b_piece, a_piece)
+    print(a_poly_starting_point)
 
     # translate B with trans: B->A = pt_a_ymin - pt_b_ymax
-    dx = pt_a_ymin[0] - pt_b_ymax[0]
-    dy = pt_a_ymin[1] - pt_b_ymax[1]
-    b_poly = orient_polygons(translate(b_poly_untranslated, xoff=dx, yoff=dy))
+    # reference point is on polygon b = orbiting
+    dx = a_poly_starting_point[0] - reference_point[0]
+    dy = a_poly_starting_point[1] - reference_point[1]
+    b_poly = orient_polygons(set_precision(translate(Polygon(b_piece.vertices), xoff=dx, yoff=dy), INTERSECTION_PRECISION))
     b_poly_edges = helper.get_edges(b_poly)
+
+    print(list(a_poly.exterior.coords))
+    print(list(b_poly.exterior.coords))
 
     if not a_poly.touches(b_poly):
         raise Exception("Polygons need to touch at the start")
 
+    nfp = [a_poly_starting_point]
+    nfp_edges = []
     nfp_is_closed_loop = False
     while not nfp_is_closed_loop:
         shared_points = []
