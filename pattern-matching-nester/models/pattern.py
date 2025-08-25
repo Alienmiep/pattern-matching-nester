@@ -1,3 +1,5 @@
+from models.piece import Piece
+
 class Pattern():
     def __init__(self, pieces: list, seams: list):
         self.pieces = pieces
@@ -5,6 +7,12 @@ class Pattern():
 
     def __str__(self):
         return ";\n".join([str(x) for x in self.pieces]) if self.pieces else ""
+
+    def get_piece_by_name(self, name: str) -> Piece:
+        for p in self.pieces:
+            if p.name == name:
+                return p
+        raise Exception(f"Piece {name} not found")
 
     def find_seams_by_pair(self, part_1_name: str, part_2_name: str) -> list:
         affected_seams = []

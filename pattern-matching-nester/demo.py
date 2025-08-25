@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF
+from copy import deepcopy
 
 from shapely import Polygon, LineString, MultiLineString, set_precision
 from shapely.geometry import box
@@ -52,6 +53,23 @@ def linestrings_to_qpainterpath(lines: list) -> QPainterPath:
     return path
 
 
+def make_highlightable_seam(seam) -> QPainterPath:
+    # Seam(id=9, seamparts=[Seampart(part='left_ftorso+right_ftorso', start=13, end=14), Seampart(part='left_btorso+right_btorso', start=3, end=4)], matchable=False)
+    qp_path = QPainterPath()
+    for seampart in seam.seamparts:
+        part = full_pattern.get_piece_by_name(seampart.part)
+        wrap_around_safe_vertices = deepcopy(part.vertices)
+        wrap_around_safe_vertices.extend(wrap_around_safe_vertices)
+        vertices = wrap_around_safe_vertices[seampart.start:seampart.end + 1]
+
+        first_x, first_y = vertices[0]
+        qp_path.moveTo(first_x, first_y)
+        for vertex in vertices:
+            qp_path.lineTo(vertex[0], vertex[1])
+
+    return qp_path
+
+
 def bounding_box_from_polygon(poly_vertices: list) -> list:
     poly = Polygon(poly_vertices)
     minx, miny, maxx, maxy = poly.bounds
@@ -59,7 +77,7 @@ def bounding_box_from_polygon(poly_vertices: list) -> list:
     return list(bbox.exterior.coords)[:-1]  # cut off duplicate closing point
 
 
-def generate_stripe_segments(ifp: Polygon) -> list:
+def generate_stripe_segments(ifp: Polygon, offset: float=0) -> list:
     if ifp is None:
         ifp = Polygon(fabric_vertices)
 
@@ -67,8 +85,8 @@ def generate_stripe_segments(ifp: Polygon) -> list:
 
      # Generate horizontal stripe lines
     stripe_lines = [
-        LineString([(x_min, y), (x_max, y)])
-        for y in range(int(y_min), int(y_max) + 1, stripe_spacing)
+        LineString([(x_min, y + offset), (x_max, y + offset)])
+        for y in range(int(y_min), int(y_max), stripe_spacing)
     ]
 
     # Intersect each line with the IFP and flatten results
@@ -82,6 +100,18 @@ def generate_stripe_segments(ifp: Polygon) -> list:
                 result.extend(intersection.geoms)
 
     return result
+
+
+def generate_line_texture() -> list:
+    xs, ys = zip(*fabric_vertices)
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+
+    stripe_lines = [
+        LineString([(x_min, y), (x_max, y)])
+        for y in range(int(y_min), int(y_max) + 1, stripe_spacing)
+    ]
+    return stripe_lines
 
 
 def stretch_rectangle(rect: Polygon, offsets: tuple) -> Polygon:
@@ -207,7 +237,7 @@ class ZoomableGraphicsView(QGraphicsView):
 class PolygonViewer(QMainWindow):
     def __init__(self, pieces: list):
         super().__init__()
-        self.pieces = pieces
+        self.pieces = deepcopy(pieces)
         self.placed_pieces = []
         self.setWindowTitle("Interactive Algorithm Demo")
         self.setGeometry(100, 100, 800, 600)
@@ -264,7 +294,9 @@ class PolygonViewer(QMainWindow):
         }
         self.points_of_interest = []
 
-        self.fabric_texture = generate_stripe_segments(None) if FABRIC_STRIPE_SWITCH else None
+        self.fabric_texture = generate_line_texture() if FABRIC_STRIPE_SWITCH else None
+        self.target_lines = []
+        self.offset = 0
         self.draw_everything()
 
     def fit_all(self) -> None:
@@ -275,8 +307,6 @@ class PolygonViewer(QMainWindow):
 
     def clear_ifp_nfp(self) -> None:
         self.__clear_ifp_nfp()
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def __clear_ifp_nfp(self) -> None:
@@ -287,7 +317,10 @@ class PolygonViewer(QMainWindow):
                 keys_to_remove.append(key)
         for key in keys_to_remove:
             self.shapes.pop(key)
+        if "highlighted_seams" in self.shapes:
+            self.shapes.pop("highlighted_seams")
         self.points_of_interest = []
+        self.target_lines = []
 
     def advance_piece(self) -> None:
         if not self.pieces:
@@ -316,28 +349,45 @@ class PolygonViewer(QMainWindow):
 
             # goal here: select a good reference point on the current (= orbiting) piece
             seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
+            partner_seampart = current_seam.seamparts[1] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[0]  # the other one
             reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
             self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
             print("current piece vertices", self.current_piece.vertices)
             print("current piece reference point", self.current_piece.reference_point)
 
+            partner_piece = full_pattern.get_piece_by_name(partner_seampart.part)
+            if self.current_piece.reference_point == self.current_piece.vertices[seampart_current_piece.start]:
+                partner_reference_point = partner_piece.vertices[partner_seampart.start]
+            else:
+                partner_reference_point = partner_piece.vertices[partner_seampart.end]
+            self.shapes["highlighted_seams"] = make_highlightable_seam(current_seam)
+            if FABRIC_STRIPE_SWITCH:
+                self.offset = partner_reference_point[1] % stripe_spacing
+                self.target_lines = generate_stripe_segments(None, self.offset)
+
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
         self.points_of_interest = [self.current_piece.reference_point]
 
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(None)
+        # TODO highlight seam pair
         self.draw_everything()
 
     def draw_everything(self) -> None:
         self.scene.clear()
         if self.fabric_texture:
             self.draw_texture()
+        if self.target_lines:
+            path = linestrings_to_qpainterpath(self.target_lines)
+            item = PathItem(path, {"color": "#bbbbbb"}, viewer=self)
+            self.scene.addItem(item)
         for key, shape in self.shapes.items():
-            if "color" in key:
+            if "color" in key or "seams" in key:
                 continue
             shape_path = vertices_to_qpainterpath(shape)
             attributes = {"color": self.shapes[f"{key}_color"]} if f"{key}_color" in self.shapes else {}
             item = PathItem(shape_path, attributes, viewer=self)
+            self.scene.addItem(item)
+        if "highlighted_seams" in self.shapes:
+            item = PathItem(self.shapes["highlighted_seams"], {"color": "#1dcc1d"}, viewer=self)
             self.scene.addItem(item)
 
         # Add vertex dot for interesting points
@@ -347,7 +397,7 @@ class PolygonViewer(QMainWindow):
 
     def draw_texture(self):
         texture_path = linestrings_to_qpainterpath(self.fabric_texture)
-        item = PathItem(texture_path, {"color": "#bbbbbb"}, viewer=self)
+        item = PathItem(texture_path, {"color": "#3e4bff"}, viewer=self)
         self.scene.addItem(item)
 
     def translate_current_piece(self, translation) -> None:
@@ -359,8 +409,8 @@ class PolygonViewer(QMainWindow):
 
     def show_ifp(self) -> None:
         ifp_vertices = ifp(self.current_piece, fabric_vertices)
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
+        if FABRIC_STRIPE_SWITCH and self.placed_pieces:
+            self.target_lines = generate_stripe_segments(Polygon(ifp_vertices))
         self.shapes["ifp"] = ifp_vertices
         self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
@@ -392,9 +442,9 @@ class PolygonViewer(QMainWindow):
             result = set_precision(result_imprecise, INTERSECTION_PRECISION)
 
         if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(result)
+            self.target_lines = generate_stripe_segments(result, self.offset)
             target_point = min(
-                (pt for line in self.fabric_texture for pt in line.coords),
+                (pt for line in self.target_lines for pt in line.coords),
                 key=lambda p: (p[0], p[1])
             )
         else:  # just use IFP corner
