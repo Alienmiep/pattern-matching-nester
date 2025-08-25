@@ -299,9 +299,30 @@ class PolygonViewer(QMainWindow):
         self.current_piece_vertices_calc = self.current_piece.vertices
         if not self.placed_pieces:
             self.current_piece.reference_point = min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))
-            self.points_of_interest = [self.current_piece.reference_point]
+        else:
+            # see if the current piece shares any seams with previously placed pieces
+            # prioritize matchable seams
+            # select first seam, get 2 reference point pairs from it
+            # test both for viability (throw error if neither of them are AND we have a matchable seam)
+            # if there are no viable ones, find a different vertex on placed piece
+            # reference points are relative to the NFP and one piece can have multiple for the different NFPs
+
+            affected_seams = get_shared_seams_with_placed_pieces(self.current_piece, self.placed_pieces)
+            if any([x.matchable for x in affected_seams]):
+                # TODO get first matchable seam
+                pass
+            else:
+                current_seam = affected_seams[0]
+
+            # goal here: select a good reference point on the current (= orbiting) piece
+            seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
+            reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
+            self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
+            print("current piece vertices", self.current_piece.vertices)
+            print("current piece reference point", self.current_piece.reference_point)
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
+        self.points_of_interest = [self.current_piece.reference_point]
 
         if FABRIC_STRIPE_SWITCH:
             self.fabric_texture = generate_stripe_segments(None)
@@ -334,7 +355,7 @@ class PolygonViewer(QMainWindow):
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.vertices
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
-        self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
+        self.points_of_interest = [self.current_piece.reference_point]
 
     def show_ifp(self) -> None:
         ifp_vertices = ifp(self.current_piece, fabric_vertices)
@@ -357,28 +378,6 @@ class PolygonViewer(QMainWindow):
         if not self.placed_pieces:
             self.fit_first_piece()
             return
-
-        # see if the current piece shares any seams with previously placed pieces
-        # prioritize matchable seams
-        # select first seam, get 2 reference point pairs from it
-        # test both for viability (throw error if neither of them are AND we have a matchable seam)
-        # if there are no viable ones, find a different vertex on placed piece
-        # reference points are relative to the NFP and one piece can have multiple for the different NFPs
-
-        affected_seams = get_shared_seams_with_placed_pieces(self.current_piece, self.placed_pieces)
-        if any([x.matchable for x in affected_seams]):
-            # TODO get first matchable seam
-            pass
-        else:
-            current_seam = affected_seams[0]
-
-        # TODO move this to before the IFP is created (for all pieces, not just the second and beyond)
-        # goal here: select a good reference point on the current (= orbiting) piece
-        seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
-        reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
-        self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
-        print("current piece vertices", self.current_piece.vertices)
-        print("current piece reference point", self.current_piece.reference_point)
 
         # reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
         main_polygon = Polygon(self.shapes["ifp"])
