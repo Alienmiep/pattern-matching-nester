@@ -53,23 +53,6 @@ def linestrings_to_qpainterpath(lines: list) -> QPainterPath:
     return path
 
 
-def make_highlightable_seam(seam) -> QPainterPath:
-    # Seam(id=9, seamparts=[Seampart(part='left_ftorso+right_ftorso', start=13, end=14), Seampart(part='left_btorso+right_btorso', start=3, end=4)], matchable=False)
-    qp_path = QPainterPath()
-    for seampart in seam.seamparts:
-        part = full_pattern.get_piece_by_name(seampart.part)
-        wrap_around_safe_vertices = deepcopy(part.vertices)
-        wrap_around_safe_vertices.extend(wrap_around_safe_vertices)
-        vertices = wrap_around_safe_vertices[seampart.start:seampart.end + 1]
-
-        first_x, first_y = vertices[0]
-        qp_path.moveTo(first_x, first_y)
-        for vertex in vertices:
-            qp_path.lineTo(vertex[0], vertex[1])
-
-    return qp_path
-
-
 def bounding_box_from_polygon(poly_vertices: list) -> list:
     poly = Polygon(poly_vertices)
     minx, miny, maxx, maxy = poly.bounds
@@ -360,10 +343,10 @@ class PolygonViewer(QMainWindow):
                 partner_reference_point = partner_piece.vertices[partner_seampart.start]
             else:
                 partner_reference_point = partner_piece.vertices[partner_seampart.end]
-            self.shapes["highlighted_seams"] = make_highlightable_seam(current_seam)
-            if FABRIC_STRIPE_SWITCH:
-                self.offset = partner_reference_point[1] % stripe_spacing
-                self.target_lines = generate_stripe_segments(None, self.offset)
+            self.shapes["highlighted_seams"] = self.make_highlightable_seam(current_seam)
+            # if FABRIC_STRIPE_SWITCH:
+            #     self.offset = partner_reference_point[1] % stripe_spacing
+            #     self.target_lines = generate_stripe_segments(None, self.offset)
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
         self.points_of_interest = [self.current_piece.reference_point]
@@ -377,7 +360,7 @@ class PolygonViewer(QMainWindow):
             self.draw_texture()
         if self.target_lines:
             path = linestrings_to_qpainterpath(self.target_lines)
-            item = PathItem(path, {"color": "#bbbbbb"}, viewer=self)
+            item = PathItem(path, {"color": "#ff0000"}, viewer=self)
             self.scene.addItem(item)
         for key, shape in self.shapes.items():
             if "color" in key or "seams" in key:
@@ -455,6 +438,26 @@ class PolygonViewer(QMainWindow):
         self.translate_current_piece(translation)
         self.placed_pieces.append(self.current_piece)
         self.draw_everything()
+
+    def make_highlightable_seam(self, seam) -> QPainterPath:
+        def get_piece_by_name(name):
+            for p in all_pieces:
+                if p.name == name:
+                    return p
+            raise Exception(f"Piece {name} not found")
+        # Seam(id=9, seamparts=[Seampart(part='left_ftorso+right_ftorso', start=13, end=14), Seampart(part='left_btorso+right_btorso', start=3, end=4)], matchable=False)
+        qp_path = QPainterPath()
+        all_pieces = self.pieces + self.placed_pieces + [self.current_piece]
+        for seampart in seam.seamparts:
+            part = get_piece_by_name(seampart.part)
+            vertices = part.vertices[seampart.start:seampart.end + 1]  if seampart.start < seampart.end else part.vertices[seampart.end:seampart.start + 1]  # TODO handle wrap-around
+
+            first_x, first_y = vertices[0]
+            qp_path.moveTo(first_x, first_y)
+            for vertex in vertices:
+                qp_path.lineTo(vertex[0], vertex[1])
+
+        return qp_path
 
 if __name__ == '__main__':
     if not os.path.exists(SVG_FILE):
