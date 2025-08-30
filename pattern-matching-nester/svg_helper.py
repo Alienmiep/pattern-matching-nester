@@ -95,7 +95,6 @@ def combine_paths(path1: Path, path2: Path) -> Path:
 
 
 def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> tuple:
-    # TODO adjust the vertex indices stored in the seams as well...
     merged_pieces = []
     index_mappings = {}   # {old_piece_name: {old_index: new_index}}
     merged_names = {}     # {old_piece_name: new_piece_name}
@@ -263,8 +262,8 @@ def load_selected_paths(svg_file: str) -> list:
             current_elem = current_elem.getparent()
 
         # sort out sleeves to merge them (if needed)
+        name_attr = elem.attrib.get('name')
         if MERGE_SLEEVES:
-            name_attr = elem.attrib.get('name')
             if name_attr and 'sleeve' in name_attr.lower():
                 sleeve_paths.append((name_attr.lower(), path_data))
                 continue

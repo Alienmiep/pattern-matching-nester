@@ -21,7 +21,7 @@ from helper import INTERSECTION_PRECISION, find_valid_starting_position
 
 # "pattern profile"
 SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
-MERGE_PIECES = True  # TODO ensure piece names are read even when not merging
+MERGE_PIECES = True
 MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
 
