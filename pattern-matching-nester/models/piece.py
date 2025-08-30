@@ -4,13 +4,18 @@ from shapely.geometry import Polygon
 COORDINATE_DECIMAL_PLACES = 1
 
 class Piece():
-    def __init__(self, index: int, name: str, path: Path, unit_scale: float):
+    def __init__(self, index: int, name: str, path: Path, unit_scale: float, _original_pieces: list=[]):
         self.index = index
         self.name = name
         self.path = path
         self.original_vertices, self.vertices, self.vertex_mapping = self.__extract_vertices(unit_scale)
+        self._original_pieces = _original_pieces  # pieces that make up a merged piece, used for exporting
+
         self.aabb = None
         self.reference_point_index = None
+
+        self.translation = (0, 0)
+        self.rotation = 0
 
     @property
     def reference_point(self):
@@ -69,6 +74,14 @@ class Piece():
 
         return original_vertices, vertices, vertex_mapping  # NFP algorithm ensures vertices are in the right order (counter-clockwise)
 
-    def area(self):
+    def area(self) -> float:
         polygon = Polygon(self.vertices)
         return polygon.area
+
+    def translate(self, translation: tuple) -> None:
+        self.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.vertices]
+        self.translation[0] += translation[0]
+        self.translation[1] += translation[1]
+
+    def rotate(self, angle: float) -> None:
+        raise NotImplementedError("Rotating Piece objects is not supported yet")
