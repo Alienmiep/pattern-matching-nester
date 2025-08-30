@@ -1,5 +1,5 @@
 import svgwrite
-from svgpathtools import wsvg
+from svgpathtools import wsvg, Path
 from models.pattern import Pattern
 
 def export_piece_to_svg(piece, filename, original_svg_attrs=None):
@@ -24,12 +24,19 @@ def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     dwg.save()
 
 
+def translate_path(path: Path, dx: float, dy: float) -> Path:
+    offset = complex(dx, -dy + 150)  # TODO use actual fabric height
+    return Path(*(seg.translated(offset) for seg in path))
+
+
 def export_full_pattern(pattern: Pattern, filename: str, original_svg_attrs=None):
     dwg = svgwrite.Drawing(filename, profile='tiny')
 
     # Use svgpathtools to get the SVG path string
     for piece in pattern.pieces:
-        svg_path_str = piece.path.d() + "Z"
+        dx, dy = piece.translation
+        translated_path = translate_path(piece.path, dx, dy)
+        svg_path_str = translated_path.d() + "Z"
         if original_svg_attrs:
             for k, v in original_svg_attrs.items():
                 dwg.attribs[k] = v
