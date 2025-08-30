@@ -465,7 +465,7 @@ class PolygonViewer(QMainWindow):
         return qp_path
 
     def export_layout(self) -> None:
-        export_full_pattern(full_pattern, "cutting_layout.svg")
+        export_full_pattern(Pattern(self.placed_pieces, final_seams), "cutting_layout.svg")
 
 
 if __name__ == '__main__':

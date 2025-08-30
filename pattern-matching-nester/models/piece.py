@@ -80,8 +80,10 @@ class Piece():
 
     def translate(self, translation: tuple) -> None:
         self.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.vertices]
-        self.translation[0] += translation[0]
-        self.translation[1] += translation[1]
+        self.translation = (
+            self.translation[0] + translation[0],
+            self.translation[1] + translation[1]
+        )
 
     def rotate(self, angle: float) -> None:
         raise NotImplementedError("Rotating Piece objects is not supported yet")
