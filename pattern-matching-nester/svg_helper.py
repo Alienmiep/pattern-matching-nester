@@ -112,7 +112,7 @@ def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> tuple:
 
                 new_path = combine_paths(piece.path, p.path)
                 new_name = f"{piece.name}+{p.name}"
-                new_piece = Piece(-1, new_name, new_path, unit_scale)
+                new_piece = Piece(-1, new_name, new_path, unit_scale, _original_pieces=[piece, p])
 
                 # Build index mappings
                 mapping_piece = {i: new_piece.vertices.index(v) for i, v in enumerate(piece.vertices)}
@@ -234,7 +234,7 @@ def get_svg_attributes(svg_file: str) -> dict:
     }
 
 
-def load_selected_paths(svg_file: str) -> list:
+def load_selected_paths(svg_file: str) -> tuple:
     tree = ETree.parse(svg_file)
     root = tree.getroot()
     selected_paths = []
@@ -262,6 +262,7 @@ def load_selected_paths(svg_file: str) -> list:
             current_elem = current_elem.getparent()
 
         # sort out sleeves to merge them (if needed)
+        sleeve_piece_modifiers = {}
         name_attr = elem.attrib.get('name')
         if MERGE_SLEEVES:
             if name_attr and 'sleeve' in name_attr.lower():
@@ -270,16 +271,18 @@ def load_selected_paths(svg_file: str) -> list:
         selected_paths.append((name_attr.lower(), path))
 
     if sleeve_paths:
-        sleeve_paths = prepare_sleeve_paths_for_merge(sleeve_paths)
+        sleeve_paths, sleeve_piece_modifiers = prepare_sleeve_paths_for_merge(sleeve_paths)
 
     selected_paths.extend(sleeve_paths)
-    return selected_paths
+    return selected_paths, sleeve_piece_modifiers
 
 
 
-def prepare_sleeve_paths_for_merge(path_tuples: list) -> list:
+def prepare_sleeve_paths_for_merge(path_tuples: list) -> tuple:
     if len(path_tuples) not in (2, 4):
         raise ValueError(f"Expected 2 or 4 sleeve paths, got {len(path_tuples)}")
+
+    all_sleeve_piece_modifiers = {}
 
     # Get min and max x for each path
     path_names = [x[0] for x in path_tuples]
@@ -296,7 +299,8 @@ def prepare_sleeve_paths_for_merge(path_tuples: list) -> list:
     min_path_name = path_names[min_x_idx]
     max_path_name = path_names[max_x_idx]
 
-    aligned_min_path, aligned_max_path = align_sleeve_halves(min_path_str, max_path_str)
+    aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path_str, min_path_name, max_path_str, max_path_name)
+    all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
     merged_paths = [(min_path_name, aligned_min_path), (max_path_name, aligned_max_path)]
 
     # If we have 4 paths, merge the remaining pair
@@ -312,13 +316,15 @@ def prepare_sleeve_paths_for_merge(path_tuples: list) -> list:
         min_x2, _ = get_path_extreme_x(p2)
 
         if min_x1 <= min_x2:
-            aligned_min_path, aligned_max_path = align_sleeve_halves(p2, p1, 20)
+            aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(p2, path_name_2, p1, path_name_1, 20)
             merged_paths.extend([(path_name_2, aligned_min_path), (path_name_1, aligned_max_path)])
+            all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
         else:
-            aligned_min_path, aligned_max_path = align_sleeve_halves(p1, p2, 20)
+            aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(p1, path_name_1, p2, path_name_2, 20)
             merged_paths.extend([(path_name_1, aligned_min_path), (path_name_2, aligned_max_path)])
+            all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
 
-    return merged_paths
+    return merged_paths, all_sleeve_piece_modifiers
 
 
 def get_path_extreme_x(path_str):
@@ -327,13 +333,14 @@ def get_path_extreme_x(path_str):
     return min(xs), max(xs)
 
 
-def align_sleeve_halves(min_path_str: str, max_path_str: str, offset: int=0) -> tuple:
+def align_sleeve_halves(min_path_str: str, min_path_name: str, max_path_str: str, max_path_name: str, offset: int=0) -> tuple:
+    sleeve_piece_modifiers = {}
     min_path = parse_path(min_path_str)
     max_path = parse_path(max_path_str)
     v1, n1 = get_sleeve_edge_vertices(min_path, mode='min')
     v2, n2 = get_sleeve_edge_vertices(max_path, mode='max')
-    min_path_rotated = rotate_path_to_horizontal(min_path, v1, n1)
-    max_path_rotated = rotate_path_to_horizontal(max_path, v2, n2)
+    min_path_rotated, min_angle = rotate_path_to_horizontal(min_path, v1, n1)
+    max_path_rotated, max_angle = rotate_path_to_horizontal(max_path, v2, n2)
 
     midpoint = (v1 + v2) / 2 + offset
     min_offset = midpoint - v1
@@ -341,7 +348,10 @@ def align_sleeve_halves(min_path_str: str, max_path_str: str, offset: int=0) -> 
     aligned_min_path = min_path_rotated.translated(min_offset)
     aligned_max_path = max_path_rotated.translated(max_offset)
 
-    return aligned_min_path, aligned_max_path
+    sleeve_piece_modifiers[min_path_name] = {"translation": (min_offset.real, min_offset.imag), "rotation": round(min_angle, 2)}
+    sleeve_piece_modifiers[max_path_name] = {"translation": (max_offset.real, max_offset.imag), "rotation": round(max_angle, 2)}
+
+    return aligned_min_path, aligned_max_path, sleeve_piece_modifiers
 
 
 def get_sleeve_edge_vertices(path, mode='min'):
@@ -375,7 +385,7 @@ def get_sleeve_edge_vertices(path, mode='min'):
     return current, neighbor
 
 
-def rotate_path_to_horizontal(path: Path, edge_start, edge_end):
+def rotate_path_to_horizontal(path: Path, edge_start, edge_end) -> tuple:
     dx = edge_end.real - edge_start.real
     dy = edge_end.imag - edge_start.imag
 
@@ -396,7 +406,7 @@ def rotate_path_to_horizontal(path: Path, edge_start, edge_end):
     #     colors=["red", "blue"]
     # )
 
-    return restored
+    return restored, angle
 
 
 def apply_svg_transform(path: Path, transform_str: str) -> Path:

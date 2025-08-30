@@ -17,6 +17,7 @@ from svg_helper import *
 from ifp import ifp
 from nfp import nfp
 from helper import INTERSECTION_PRECISION, find_valid_starting_position
+from export_svg import export_full_pattern
 
 
 # "pattern profile"
@@ -271,6 +272,10 @@ class PolygonViewer(QMainWindow):
         side_layout.addWidget(self.clear_ifp_nfp_button)
         self.clear_ifp_nfp_button.clicked.connect(self.clear_ifp_nfp)
 
+        self.export_cutting_layout_button = QPushButton("Export cutting layout")
+        side_layout.addWidget(self.export_cutting_layout_button)
+        self.export_cutting_layout_button.clicked.connect(self.export_layout)
+
         # set up data structures
         self.shapes = {
             "fabric": fabric_vertices
@@ -384,7 +389,7 @@ class PolygonViewer(QMainWindow):
         self.scene.addItem(item)
 
     def translate_current_piece(self, translation) -> None:
-        self.current_piece.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece.vertices]
+        self.current_piece.translate(translation)
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.vertices
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
@@ -459,6 +464,10 @@ class PolygonViewer(QMainWindow):
 
         return qp_path
 
+    def export_layout(self) -> None:
+        export_full_pattern(full_pattern, "cutting_layout.svg")
+
+
 if __name__ == '__main__':
     if not os.path.exists(SVG_FILE):
             raise FileNotFoundError(f"SVG file not found: {SVG_FILE}")
@@ -467,12 +476,16 @@ if __name__ == '__main__':
     height = svg_attributes.get("height")
     unit_scale = 0.1 if "mm" in height else 1
 
-    paths = load_selected_paths(SVG_FILE)
+    paths, sleeve_piece_modifiers = load_selected_paths(SVG_FILE)
+    print(sleeve_piece_modifiers)
 
     pieces = []
     for index, path_tuple in enumerate(paths):
         name, path = path_tuple
         piece = Piece(index, name, path, unit_scale)
+        if name in sleeve_piece_modifiers:
+            piece.translation = sleeve_piece_modifiers[name]["translation"]
+            piece.rotation = sleeve_piece_modifiers[name]["rotation"]
         pieces.append(piece)
 
     # for p in pieces:

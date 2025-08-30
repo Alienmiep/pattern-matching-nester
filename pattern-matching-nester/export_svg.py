@@ -1,5 +1,6 @@
 import svgwrite
 from svgpathtools import wsvg
+from models.pattern import Pattern
 
 def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     """Export a Piece object directly to an SVG file using its existing Path."""
@@ -23,7 +24,7 @@ def export_piece_to_svg(piece, filename, original_svg_attrs=None):
     dwg.save()
 
 
-def export_full_pattern(pattern, filename, original_svg_attrs=None):
+def export_full_pattern(pattern: Pattern, filename: str, original_svg_attrs=None):
     dwg = svgwrite.Drawing(filename, profile='tiny')
 
     # Use svgpathtools to get the SVG path string
