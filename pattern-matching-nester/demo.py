@@ -28,7 +28,7 @@ ALLOWED_CLASS_LISTS = []
 
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 stripe_spacing = 10
-FABRIC_STRIPE_SWITCH = True
+FABRIC_STRIPE_SWITCH = False
 
 
 def vertices_to_qpainterpath(vertices: list) -> QPainterPath:
@@ -436,7 +436,16 @@ class PolygonViewer(QMainWindow):
                 key=lambda p: (p[0], p[1])
             )
         else:  # just use IFP corner
-            coords = list(result.exterior.coords)[:-1]
+            if result.geom_type == "Polygon":
+                polygons = [result]
+            elif result.geom_type == "MultiPolygon":
+                polygons = list(result.geoms)
+            else:
+                raise TypeError("Unexpected geometry type: " + result.geom_type)
+
+            coords = []
+            for poly in polygons:
+                coords.extend(list(poly.exterior.coords)[:-1])
             target_point = min(coords, key=lambda p: (p[0], p[1]))
 
         translation = (target_point[0] - self.current_piece.reference_point[0], target_point[1] - self.current_piece.reference_point[1])
