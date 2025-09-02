@@ -2,10 +2,10 @@ import os
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsView, QGraphicsScene, QGraphicsPathItem, QPushButton,
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextEdit, QGraphicsItem, QGraphicsEllipseItem
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextEdit, QGraphicsItem, QGraphicsEllipseItem, QSpinBox, QCheckBox
 )
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
-from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtCore import Qt, QPointF, pyqtSignal
 from copy import deepcopy
 
 from shapely import Polygon, LineString, MultiLineString, set_precision
@@ -26,9 +26,9 @@ MERGE_PIECES = True
 MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
 
-fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
-stripe_spacing = 10
-FABRIC_STRIPE_SWITCH = False
+# fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
+# stripe_spacing = 10
+# FABRIC_STRIPE_SWITCH = False
 
 
 def vertices_to_qpainterpath(vertices: list) -> QPainterPath:
@@ -61,7 +61,7 @@ def bounding_box_from_polygon(poly_vertices: list) -> list:
     return list(bbox.exterior.coords)[:-1]  # cut off duplicate closing point
 
 
-def generate_stripe_segments(ifp: Polygon, offset: float=0) -> list:
+def generate_stripe_segments(ifp: Polygon, fabric_vertices, stripe_spacing: bool, offset: float=0) -> list:
     if ifp is None:
         ifp = Polygon(fabric_vertices)
 
@@ -86,7 +86,7 @@ def generate_stripe_segments(ifp: Polygon, offset: float=0) -> list:
     return result
 
 
-def generate_line_texture() -> list:
+def generate_line_texture(fabric_vertices: list, stripe_spacing: int) -> list:
     xs, ys = zip(*fabric_vertices)
     x_min, x_max = min(xs), max(xs)
     y_min, y_max = min(ys), max(ys)
@@ -218,11 +218,81 @@ class ZoomableGraphicsView(QGraphicsView):
         self.scale(zoom, zoom)
 
 
+class FabricConfigWidget(QWidget):
+    applied = pyqtSignal(list, int, bool)  # fabric_vertices, stripe_spacing, stripe_enabled
+
+    def __init__(self, fabric_width, fabric_length, stripes_enabled, stripe_spacing):
+        super().__init__()
+        self.init_ui(fabric_width, fabric_length, stripes_enabled, stripe_spacing)
+
+    def init_ui(self, fabric_width, fabric_length, stripes_enabled, stripe_spacing):
+        layout = QVBoxLayout()
+
+        # Fabric width
+        width_layout = QHBoxLayout()
+        width_layout.addWidget(QLabel("Fabric Width (cm):"))
+        self.width_input = QSpinBox()
+        self.width_input.setRange(1, 1000)
+        self.width_input.setValue(fabric_width)
+        width_layout.addWidget(self.width_input)
+        layout.addLayout(width_layout)
+
+        # Fabric length
+        length_layout = QHBoxLayout()
+        length_layout.addWidget(QLabel("Fabric Length (cm):"))
+        self.length_input = QSpinBox()
+        self.length_input.setRange(1, 1000)
+        self.length_input.setValue(fabric_length)
+        length_layout.addWidget(self.length_input)
+        layout.addLayout(length_layout)
+
+        # Stripe switch
+        self.stripe_checkbox = QCheckBox("Enable Stripes")
+        self.stripe_checkbox.setChecked(stripes_enabled)
+        self.stripe_checkbox.stateChanged.connect(self.toggle_stripe_input)
+        layout.addWidget(self.stripe_checkbox)
+
+        # Stripe width
+        stripe_layout = QHBoxLayout()
+        stripe_layout.addWidget(QLabel("Stripe Spacing (cm):"))
+        self.stripe_input = QSpinBox()
+        self.stripe_input.setRange(1, 100)
+        self.stripe_input.setValue(stripe_spacing)
+        self.stripe_input.setEnabled(True)
+        stripe_layout.addWidget(self.stripe_input)
+        layout.addLayout(stripe_layout)
+
+        # Apply button
+        apply_button = QPushButton("Apply")
+        apply_button.clicked.connect(self.on_apply)
+        layout.addWidget(apply_button)
+
+        self.setLayout(layout)
+
+    def toggle_stripe_input(self, state):
+        self.stripe_input.setEnabled(state == 2)
+
+    def get_values(self):
+        width = self.width_input.value()
+        length = self.length_input.value()
+        fabric_vertices = [(0, 0), (length, 0), (length, width), (0, width)]
+        stripe_enabled = self.stripe_checkbox.isChecked()
+        stripe_spacing = self.stripe_input.value() if stripe_enabled else 0
+        return fabric_vertices, stripe_spacing, stripe_enabled
+
+    def on_apply(self):
+        fabric_vertices, stripe_spacing, stripe_enabled = self.get_values()
+        self.applied.emit(fabric_vertices, stripe_spacing, stripe_enabled)
+
 class PolygonViewer(QMainWindow):
     def __init__(self, pieces: list):
         super().__init__()
-        self.pieces = deepcopy(pieces)
+        self.pieces_backup_copy = pieces
+        self.pieces = deepcopy(self.pieces_backup_copy)
         self.placed_pieces = []
+        self.fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]  # default fabric size
+        self.stripes_enabled = True
+        self.stripe_spacing = 10
         self.setWindowTitle("Interactive Algorithm Demo")
         self.setGeometry(100, 100, 800, 600)
         self.showMaximized()
@@ -238,6 +308,10 @@ class PolygonViewer(QMainWindow):
         self.side_panel.setMinimumWidth(200)
         side_layout = QVBoxLayout()
         self.side_panel.setLayout(side_layout)
+        # Add fabric controls to side panel
+        self.fabric_controls = FabricConfigWidget(150, 200, self.stripes_enabled, self.stripe_spacing)
+        side_layout.addWidget(self.fabric_controls)
+        self.fabric_controls.applied.connect(self.update_fabric)
 
         # --- Graphics View ---
         self.view = ZoomableGraphicsView(self)
@@ -278,11 +352,11 @@ class PolygonViewer(QMainWindow):
 
         # set up data structures
         self.shapes = {
-            "fabric": fabric_vertices
+            "fabric": self.fabric_vertices
         }
         self.points_of_interest = []
 
-        self.fabric_texture = generate_line_texture() if FABRIC_STRIPE_SWITCH else None
+        self.fabric_texture = generate_line_texture(self.fabric_vertices, self.stripe_spacing) if self.stripes_enabled else None
         self.target_lines = []
         self.offset = 0
         self.draw_everything()
@@ -396,9 +470,11 @@ class PolygonViewer(QMainWindow):
         self.points_of_interest = [self.current_piece.reference_point]
 
     def show_ifp(self) -> None:
-        ifp_vertices = ifp(self.current_piece, fabric_vertices)
-        if FABRIC_STRIPE_SWITCH and self.placed_pieces:
-            self.target_lines = generate_stripe_segments(Polygon(ifp_vertices))
+        ifp_vertices = ifp(self.current_piece, self.fabric_vertices)
+        if self.stripes_enabled and self.placed_pieces:
+            self.target_lines = generate_stripe_segments(Polygon(ifp_vertices), self.fabric_vertices, self.stripe_spacing)
+        else:
+            self.target_lines = []
         self.shapes["ifp"] = ifp_vertices
         self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
@@ -429,13 +505,14 @@ class PolygonViewer(QMainWindow):
             result_imprecise = result.difference(nfp_poly)
             result = set_precision(result_imprecise, INTERSECTION_PRECISION)
 
-        if FABRIC_STRIPE_SWITCH:
-            self.target_lines = generate_stripe_segments(result, self.offset)
+        if self.stripes_enabled:
+            self.target_lines = generate_stripe_segments(result, self.fabric_vertices, self.stripe_spacing, self.offset)
             target_point = min(
                 (pt for line in self.target_lines for pt in line.coords),
                 key=lambda p: (p[0], p[1])
             )
         else:  # just use IFP corner
+            self.target_lines = []
             if result.geom_type == "Polygon":
                 polygons = [result]
             elif result.geom_type == "MultiPolygon":
@@ -475,6 +552,25 @@ class PolygonViewer(QMainWindow):
 
     def export_layout(self) -> None:
         export_full_pattern(Pattern(self.placed_pieces, final_seams), "cutting_layout.svg")
+
+    def update_fabric(self, fabric_vertices, stripe_spacing, stripe_enabled):
+        print("Fabric vertices:", fabric_vertices)
+        print("Stripe spacing:", stripe_spacing)
+        print("Stripe enabled:", stripe_enabled)
+        self.pieces = deepcopy(self.pieces_backup_copy)
+        self.fabric_vertices = fabric_vertices
+        self.stripe_spacing = stripe_spacing
+        self.stripes_enabled = stripe_enabled
+        self.placed_pieces = []
+        self.shapes = {
+            "fabric": fabric_vertices
+        }
+        self.points_of_interest = []
+
+        self.fabric_texture = generate_line_texture(fabric_vertices, stripe_spacing) if stripe_enabled else None
+        self.target_lines = []
+        self.offset = 0
+        self.draw_everything()
 
 
 if __name__ == '__main__':
