@@ -5,13 +5,15 @@ input_points_local = [(180.1, 147.0), (170.3, 147.0), (160.5, 147.0), (160.5, 15
 
 reference_point_local = input_points_local[0]
 
-fabric_length = 200  # = x
-fabric_width = 150   # = y
+# fabric_length = 200  # = x
+# fabric_width = 150   # = y
 
 fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
 
 def ifp(piece: Piece, fabric_vertices: list) -> list:
     input_points = piece.vertices
+    fabric_width = fabric_vertices[2][1]  # TODO change this to be more general
+    fabric_length = fabric_vertices[2][0]
     # reference_point = min(input_points, key=lambda v: (v[0], v[1]))
 
     # Transpose the list of tuples to separate x and y values
