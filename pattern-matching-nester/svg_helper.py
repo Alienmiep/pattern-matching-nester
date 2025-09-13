@@ -282,67 +282,39 @@ def prepare_sleeve_paths_for_merge(path_tuples: list) -> tuple:
     if len(path_tuples) not in (2, 4):
         raise ValueError(f"Expected 2 or 4 sleeve paths, got {len(path_tuples)}")
 
+    left_sleeve_tuples = [x for x in path_tuples if "left" in x[0]]
+    right_sleeve_tuples = [x for x in path_tuples if "right" in x[0]]
     all_sleeve_piece_modifiers = {}
+    merged_paths = []
 
-    # Get min and max x for each path
-    path_names = [x[0] for x in path_tuples]
-    path_strs = [x[1] for x in path_tuples]
-    bounds = [(i, *get_path_extreme_x(d)) for i, d in enumerate(path_strs)]
+    if left_sleeve_tuples:
+        min_path = left_sleeve_tuples.pop(0) if left_sleeve_tuples[0][0].endswith("_f") else left_sleeve_tuples.pop(1)
+        max_path = left_sleeve_tuples.pop()
+        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path[1], min_path[0], max_path[1], max_path[0])
+        all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
+        merged_paths.extend([(min_path[0], aligned_min_path), (max_path[0], aligned_max_path)])
 
-    # Find the outermost paths
-    min_x_idx = min(bounds, key=lambda b: b[1])[0]
-    max_x_idx = max(bounds, key=lambda b: b[2])[0]
-
-    # Get their path strings
-    min_path_str = path_strs[min_x_idx]
-    max_path_str = path_strs[max_x_idx]
-    min_path_name = path_names[min_x_idx]
-    max_path_name = path_names[max_x_idx]
-
-    aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path_str, min_path_name, max_path_str, max_path_name)
-    all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
-    merged_paths = [(min_path_name, aligned_min_path), (max_path_name, aligned_max_path)]
-
-    # If we have 4 paths, merge the remaining pair
-    if len(path_strs) == 4:
-        remaining_indices = set(range(4)) - {min_x_idx, max_x_idx}
-        i1, i2 = list(remaining_indices)
-        p1, p2 = path_strs[i1], path_strs[i2]
-        path_name_1 = path_names[i1]
-        path_name_2 = path_names[i2]
-
-        # Decide which of the two remaining has the lower min-x
-        min_x1, _ = get_path_extreme_x(p1)
-        min_x2, _ = get_path_extreme_x(p2)
-
-        if min_x1 <= min_x2:
-            aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(p2, path_name_2, p1, path_name_1, 20)
-            merged_paths.extend([(path_name_2, aligned_min_path), (path_name_1, aligned_max_path)])
-            all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
-        else:
-            aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(p1, path_name_1, p2, path_name_2, 20)
-            merged_paths.extend([(path_name_1, aligned_min_path), (path_name_2, aligned_max_path)])
-            all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
+    if right_sleeve_tuples:
+        min_path = right_sleeve_tuples.pop(0) if right_sleeve_tuples[0][0].endswith("_f") else right_sleeve_tuples.pop(1)
+        max_path = right_sleeve_tuples.pop()
+        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path[1], min_path[0], max_path[1], max_path[0])
+        all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
+        merged_paths.extend([(min_path[0], aligned_min_path), (max_path[0], aligned_max_path)])
 
     return merged_paths, all_sleeve_piece_modifiers
 
 
-def get_path_extreme_x(path_str):
-    path = parse_path(path_str)
-    xs = [seg.start.real for seg in path] + [seg.end.real for seg in path]
-    return min(xs), max(xs)
-
-
-def align_sleeve_halves(min_path_str: str, min_path_name: str, max_path_str: str, max_path_name: str, offset: int=0) -> tuple:
+def align_sleeve_halves(min_path_str: str, min_path_name: str, max_path_str: str, max_path_name: str) -> tuple:
     sleeve_piece_modifiers = {}
     min_path = parse_path(min_path_str)
     max_path = parse_path(max_path_str)
+    max_path = Path(*[seg.scaled(-1, 1) for seg in max_path])
     v1, n1 = get_sleeve_edge_vertices(min_path, mode='min')
     v2, n2 = get_sleeve_edge_vertices(max_path, mode='max')
     min_path_rotated, min_angle = rotate_path_to_horizontal(min_path, v1, n1)
     max_path_rotated, max_angle = rotate_path_to_horizontal(max_path, v2, n2)
 
-    midpoint = (v1 + v2) / 2 + offset
+    midpoint = (v1 + v2) / 2
     min_offset = midpoint - v1
     max_offset = midpoint - v2
     aligned_min_path = min_path_rotated.translated(min_offset)
