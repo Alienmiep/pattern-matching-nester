@@ -116,6 +116,10 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
         return 2 if endpoint in endpoints_b else 3
 
     inter = precision_aware_intersection(precise_edge_a, precise_edge_b)
+    # fun fact! sometimes the intersection isn't a Point, but rather a LineString with length 0.0010000000000012221 :)
+    if isinstance(inter, LineString) and inter.length < 1.1 * INTERSECTION_PRECISION:
+        inter = Point(inter.coords[0])
+
     if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
         return 2
 
