@@ -290,47 +290,53 @@ def prepare_sleeve_paths_for_merge(path_tuples: list) -> tuple:
     if left_sleeve_tuples:
         min_path = left_sleeve_tuples.pop(0) if left_sleeve_tuples[0][0].endswith("_f") else left_sleeve_tuples.pop(1)
         max_path = left_sleeve_tuples.pop()
-        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path[1], min_path[0], max_path[1], max_path[0])
+        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path, max_path, is_left=True)
         all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
         merged_paths.extend([(min_path[0], aligned_min_path), (max_path[0], aligned_max_path)])
 
     if right_sleeve_tuples:
         min_path = right_sleeve_tuples.pop(0) if right_sleeve_tuples[0][0].endswith("_f") else right_sleeve_tuples.pop(1)
         max_path = right_sleeve_tuples.pop()
-        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path[1], min_path[0], max_path[1], max_path[0])
+        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path, max_path, is_left=False, offset=20)
         all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
         merged_paths.extend([(min_path[0], aligned_min_path), (max_path[0], aligned_max_path)])
 
     return merged_paths, all_sleeve_piece_modifiers
 
 
-def align_sleeve_halves(min_path_str: str, min_path_name: str, max_path_str: str, max_path_name: str) -> tuple:
+def align_sleeve_halves(min_path_tuple: tuple, max_path_tuple: tuple, is_left: bool, offset: int=0) -> tuple:
     sleeve_piece_modifiers = {}
-    min_path = parse_path(min_path_str)
-    max_path = parse_path(max_path_str)
+    min_path = parse_path(min_path_tuple[1])
+    max_path = parse_path(max_path_tuple[1])
     max_path = Path(*[seg.scaled(-1, 1) for seg in max_path])
-    v1, n1 = get_sleeve_edge_vertices(min_path, mode='min')
-    v2, n2 = get_sleeve_edge_vertices(max_path, mode='max')
+    v1, n1 = get_sleeve_edge_vertices(min_path, is_left, is_min=True)
+    v2, n2 = get_sleeve_edge_vertices(max_path, is_left, is_min=False)
     min_path_rotated, min_angle = rotate_path_to_horizontal(min_path, v1, n1)
     max_path_rotated, max_angle = rotate_path_to_horizontal(max_path, v2, n2)
 
-    midpoint = (v1 + v2) / 2
+    midpoint = (v1 + v2) / 2 + offset
     min_offset = midpoint - v1
     max_offset = midpoint - v2
     aligned_min_path = min_path_rotated.translated(min_offset)
     aligned_max_path = max_path_rotated.translated(max_offset)
 
-    sleeve_piece_modifiers[min_path_name] = {"translation": (min_offset.real, min_offset.imag), "rotation": round(min_angle, 2)}
-    sleeve_piece_modifiers[max_path_name] = {"translation": (max_offset.real, max_offset.imag), "rotation": round(max_angle, 2)}
+    sleeve_piece_modifiers[min_path_tuple[0]] = {"translation": (min_offset.real, min_offset.imag), "rotation": round(min_angle, 2)}
+    sleeve_piece_modifiers[max_path_tuple[0]] = {"translation": (max_offset.real, max_offset.imag), "rotation": round(max_angle, 2)}
+
+    # save_debug_svg(
+    #     [aligned_min_path, aligned_max_path],
+    #     filename=f"alignment_test_{is_left}.svg",
+    #     colors=["red", "blue"]
+    # )
 
     return aligned_min_path, aligned_max_path, sleeve_piece_modifiers
 
 
-def get_sleeve_edge_vertices(path, mode='min'):
+def get_sleeve_edge_vertices(path: Path, is_left: bool, is_min: bool) -> tuple:
     """
-    Given a Path object and mode ('min' or 'max'), returns the target edge as (vertex, neighbor),
+    Given a Path object, returns the target edge as (vertex, neighbor),
     where:
-        - vertex is the extreme-x point (min or max)
+        - vertex is the extreme-x point (min or max depends on whether it's the left sleeve)
         - neighbor is the adjacent point with the lowest y
     The "target edge" in this context is essentially the fold line of the sleeve, the one where GarmentCode makes a cut
     """
@@ -340,12 +346,16 @@ def get_sleeve_edge_vertices(path, mode='min'):
         points.append(seg.start)
 
     # Find index of extreme x point
-    if mode == 'min':
-        index = min(range(len(points)), key=lambda i: points[i].real)
-    elif mode == 'max':
-        index = max(range(len(points)), key=lambda i: points[i].real)
+    if is_left:
+        if is_min:
+            index = max(range(len(points)), key=lambda i: points[i].real)
+        else:
+            index = min(range(len(points)), key=lambda i: points[i].real)
     else:
-        raise ValueError("mode must be 'min' or 'max'")
+        if is_min:
+            index = min(range(len(points)), key=lambda i: points[i].real)
+        else:
+            index = max(range(len(points)), key=lambda i: points[i].real)
 
     current = points[index]
     prev = points[index - 1 if index > 0 else -1]
