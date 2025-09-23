@@ -1,7 +1,7 @@
 from itertools import product
 
 from shapely import set_precision, orient_polygons
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
 from shapely.affinity import translate
 
 import helper as helper
@@ -27,9 +27,6 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
     b_poly = orient_polygons(set_precision(translate(Polygon(b_piece.vertices), xoff=dx, yoff=dy), INTERSECTION_PRECISION))
     b_poly_edges = helper.get_edges(b_poly)
 
-    print(list(a_poly.exterior.coords))
-    print(list(b_poly.exterior.coords))
-
     if not a_poly.touches(b_poly):
         raise Exception("Polygons need to touch at the start")
 
@@ -45,7 +42,11 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
 
         # print(intersection)
 
-        shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
+        try:
+            shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
+        except Exception:
+            helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
+            raise Exception("a")
 
         # 2. orbiting
         # 2a) detection of touching edges
@@ -122,14 +123,9 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
         feasible_translation_vectors = []
         feasible_translation_vectors_edges = []
         for index, translation_vector in enumerate(potential_translation_vectors):
-            # print("+++++++++++++++++++++++")
-            # print(translation_vector)
-            # print("+++++++++++++++++++++++")
             is_feasible = True
             for pair in touching_pairs:
-                # print(pair)
                 is_feasible = is_feasible and helper.is_in_feasible_range(translation_vector, pair)  # stops checking once an edge has been found not feasible
-                # print(is_feasible)
             if is_feasible:
                 feasible_translation_vectors.append(translation_vector)
                 feasible_translation_vectors_edges.append(potential_translation_vectors_edges[index])
@@ -141,8 +137,8 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
             # cap the length of the translation vector to the length of the intersection
             feasible_translation_vectors = helper.cap_translation_vectors(feasible_translation_vectors, linestring_intersection_length)
 
-
         if not feasible_translation_vectors:
+            helper.generate_debug_output(potential_translation_vectors, touching_pairs)
             raise Exception("NFP loop is still open, but no feasible translation vectors were found")
 
         if len(feasible_translation_vectors) > 1:
@@ -152,14 +148,29 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
             if not line_intersection_flag:
                 for index, candidate in enumerate(feasible_translation_vectors):
                     b_poly_candidate = translate(b_poly, xoff=candidate[0], yoff=candidate[1])
-                    if not helper.precision_aware_intersection(a_poly, b_poly_candidate).is_empty:
+                    helper_intersection = helper.precision_aware_intersection(a_poly, b_poly_candidate)
+
+                    incident_edges_poly_a = helper.incident_edges(a_poly, intersection)
+                    if intersection.geom_type == "Point" and helper.angle_from_points(incident_edges_poly_a[0].coords[0], (intersection.x, intersection.y), incident_edges_poly_a[1].coords[1]) <= 180:
+                        translation_vector_endpoint = (intersection.x + candidate[0], intersection.y + candidate[1])
+                        translation_vector_linestring = LineString([intersection, translation_vector_endpoint])
+
+                        pokes_stationary_polygon = False
+                        for incident_edge in incident_edges_poly_a:
+                            location = helper.is_left_or_right((incident_edge), translation_vector_linestring)
+                            pokes_stationary_polygon = pokes_stationary_polygon or location == "left"
+                    else:
+                        pokes_stationary_polygon = False
+                    if not helper_intersection.is_empty and not pokes_stationary_polygon:
                         actually_feasible_vectors.append(candidate)
                         actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
                 if len(actually_feasible_vectors) > 1:
                     # choose "the edge that is nearest (in edge order) to the previous move"
                     # helper.decide_translation_vector(a_poly_edges, b_poly_edges, nfp_edges, feasible_translation_vectors, feasible_translation_vectors_edges)
+                    helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
                     raise NotImplementedError("Multiple possible translation vectors are not supported yet")
                 if not actually_feasible_vectors:
+                    helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
                     raise Exception("No feasible translation vectors left after intersection (or lack thereof) check")
             else:
                 if intersection.geom_type in ["MultiPoint", "MultiLineString", "GeometryCollection"]:
@@ -174,7 +185,9 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
                             actually_feasible_vectors.append(candidate)
                             actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
                     if len(actually_feasible_vectors) > 1:
-                        raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
+                        if not helper.basically_same_vector(actually_feasible_vectors):
+                            helper.generate_debug_output(potential_translation_vectors, touching_pairs)
+                            raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
                     if not actually_feasible_vectors:
                         raise Exception("No feasible translation vectors left after 90° check")
             untrimmed_translation = actually_feasible_vectors[0]

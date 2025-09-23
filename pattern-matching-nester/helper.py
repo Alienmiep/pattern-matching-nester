@@ -8,8 +8,8 @@ from shapely.affinity import translate
 
 from models.piece import Piece
 
-INTERSECTION_PRECISION = 0.01
-NO_OF_ROUNDING_DIGITS = 2
+INTERSECTION_PRECISION = 0.001
+NO_OF_ROUNDING_DIGITS = 3
 
 @dataclass
 class EdgePair:
@@ -24,21 +24,21 @@ def find_valid_starting_position(candidate: tuple, current_piece: Piece, piece: 
     current_piece_polygon = Polygon(current_piece.vertices)
     piece_polygon = Polygon(piece.vertices)
 
-    print("stationary piece", list(piece_polygon.exterior.coords))
+    # print("stationary piece", list(piece_polygon.exterior.coords))
     # print(candidate)
     for vertex in piece.vertices:
         translation = vector_from_points(candidate, vertex)
-        print("translation", translation)
-        print("from:", candidate, vertex)
+        # print("translation", translation)
+        # print("from:", candidate, vertex)
         translated_current_piece = translate(current_piece_polygon, xoff=translation[0], yoff=translation[1])
-        print("translated current piece", list(translated_current_piece.exterior.coords))
+        # print("translated current piece", list(translated_current_piece.exterior.coords))
         intersection = precision_aware_intersection(translated_current_piece, piece_polygon)
         try:
             _ = handle_intersection(intersection)
             print(f"Found valid starting position {vertex}")
             return vertex
         except Exception:
-            print(f"Vertex {vertex} does not work due to intersection {intersection}")
+            # print(f"Vertex {vertex} does not work due to intersection {intersection}")
             pass
 
     return None
@@ -400,7 +400,7 @@ def cap_translation_vectors(vectors: list, length: float) -> list:
             scale = length / vec_length
             vx *= scale
             vy *= scale
-        capped_vectors.append((vx, vy))
+        capped_vectors.append((round(vx, NO_OF_ROUNDING_DIGITS), round(vy, NO_OF_ROUNDING_DIGITS)))
     return capped_vectors
 
 # ----- more general helpers -----
@@ -456,3 +456,53 @@ def longest_vector(vectors: list) -> tuple:
             max_length = length
             longest_index = index
     return longest_index, vectors[longest_index]
+
+
+def basically_same_vector(vectors: list) -> bool:
+    if not vectors:
+        return False
+    ref = vectors[0]
+    tolerance = 1.1 * INTERSECTION_PRECISION
+    for v in vectors[1:]:
+        if not (abs(v[0] - ref[0]) <= tolerance and abs(v[1] - ref[1]) <= tolerance):
+            return False
+    return True
+
+
+import matplotlib
+matplotlib.use("Agg")  # non-interactive backend
+import matplotlib.pyplot as plt
+
+def generate_debug_output(translation_vectors, edge_pairs, a_poly=None, b_poly=None, filename="debug.png"):
+    def plot_polygon(ax, poly, color, label):
+        x, y = poly.exterior.xy
+        ax.fill(x, y, alpha=0.5, fc=color, ec='black', label=label)
+
+    fig, ax = plt.subplots()
+    if a_poly:
+        plot_polygon(ax, a_poly, 'red', 'A Polygon')
+    if b_poly:
+        plot_polygon(ax, b_poly, 'green', 'B Polygon')
+
+    # plot edges
+    for ep in edge_pairs:
+        x_a, y_a = ep.edge_a.xy
+        x_b, y_b = ep.edge_b.xy
+        ax.plot(x_a, y_a, color="red", linewidth=1, label="edge_a")
+        ax.plot(x_b, y_b, color="green", linewidth=1, label="edge_b")
+        ax.plot(ep.shared_vertex.x, ep.shared_vertex.y, "ko")  # black point
+
+     # get all unique anchors (shared vertices)
+    anchors = {(round(ep.shared_vertex.x, 8), round(ep.shared_vertex.y, 8)) for ep in edge_pairs}
+
+    # plot vectors from each anchor
+    for ax_x, ax_y in anchors:
+        for dx, dy in translation_vectors:
+            ax.arrow(ax_x, ax_y, dx, dy,
+                     head_width=0.5, head_length=1,
+                     fc="blue", ec="blue", alpha=0.7,
+                     length_includes_head=True)
+
+    ax.set_aspect("equal", "box")
+    plt.savefig(filename, dpi=200)
+    plt.close(fig)
