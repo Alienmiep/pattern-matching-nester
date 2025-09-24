@@ -1,15 +1,28 @@
+from typing import Optional, List, Tuple
 from svgpathtools import Path, Line, Arc, CubicBezier, QuadraticBezier
 from shapely.geometry import Polygon
 
 COORDINATE_DECIMAL_PLACES = 1
 
-class Piece():
-    def __init__(self, index: int, name: str, path: Path, unit_scale: float, _original_pieces: list=[]):
+class Piece:
+    def __init__(self, index: int, name: str, path: Path, unit_scale: float, _original_pieces: Optional[list] = None):
+        """
+        Initialize a Piece with geometry and metadata; unpack SVG Path
+
+        Args:
+            index: Unique identifier for the piece
+            name: GarmentCode name (two names separated by a + in case of merged piece)
+            path: SVG path object
+            unit_scale: Scale factor for converting path units
+            _original_pieces: Copies of the Pieces merged into this one (in case of merged piece)
+        """
         self.index = index
         self.name = name
         self.path = path
-        self.original_vertices, self.vertices, self.vertex_mapping = self.__extract_vertices(unit_scale)
-        self._original_pieces = _original_pieces  # pieces that make up a merged piece, used for exporting
+        self.original_vertices, self.vertices, self.vertex_mapping = self._extract_vertices(unit_scale)
+
+        # pieces that make up a merged piece, to be used for exporting *only*
+        self._original_pieces = self._original_pieces = _original_pieces or []
 
         self.aabb = None
         self.reference_point_index = None
@@ -22,20 +35,20 @@ class Piece():
         return self.vertices[self.reference_point_index]
 
     @reference_point.setter
-    def reference_point(self, value):
+    def reference_point(self, value: Tuple[float, float]):
         self.reference_point_index = self.vertices.index(value)
 
     def __str__(self):
-        return f"Index: {self.index}, Vertices: {self.vertices}, original Vertices: {self.original_vertices}"
+        return f"Index: {self.index},\nVertices: {self.vertices},\noriginal Vertices: {self.original_vertices}"
 
-    def __extract_vertices(self, unit_scale, base_resolution=3.0, min_samples=3, max_samples=20) -> tuple:
+    def _extract_vertices(self, unit_scale: float, base_resolution=3.0, min_samples=3, max_samples=20) -> Tuple[list, list, dict]:
         """
-        Converts a Path into:
+        Converts a SVG path into:
         - original_vertices: anchor points from the SVG path
-        - vertices: full polygon with sampled points
-        - vertex_mapping: mapping {original_index: [polygon_indices]}
+        - vertices: polygon with sampled points
+        - vertex_mapping: {original_index: polygon_index}
 
-        base_resolution: target spacing between points (in cm)
+        base_resolution: target spacing between points (in cm)\n
         min_samples / max_samples: limits on sampling granularity
         """
         vertices = []
@@ -72,13 +85,15 @@ class Piece():
                         original_vertices.append((x, y))
                         vertex_mapping[len(original_vertices) - 1] = len(vertices) - 1
 
-        return original_vertices, vertices, vertex_mapping  # NFP algorithm ensures vertices are in the right order (counter-clockwise)
+        return original_vertices, vertices, vertex_mapping  # NFP algorithm later ensures vertices are counter-clockwise
 
     def area(self) -> float:
+        """Return area of piece using Shapely's area property"""
         polygon = Polygon(self.vertices)
         return polygon.area
 
-    def translate(self, translation: tuple) -> None:
+    def translate(self, translation: Tuple[float, float]) -> None:
+        """Shift the piece by a translation vector"""
         self.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.vertices]
         self.translation = (
             self.translation[0] + translation[0],
@@ -86,4 +101,5 @@ class Piece():
         )
 
     def rotate(self, angle: float) -> None:
+        """Rotate piece in-place by an angle (not used currently)"""
         raise NotImplementedError("Rotating Piece objects is not supported yet")
