@@ -8,8 +8,8 @@ from shapely.affinity import translate
 
 from models.piece import Piece
 
-INTERSECTION_PRECISION = 0.001
-NO_OF_ROUNDING_DIGITS = 3
+INTERSECTION_PRECISION = 0.01
+NO_OF_ROUNDING_DIGITS = 2
 
 @dataclass
 class EdgePair:
@@ -466,6 +466,16 @@ def basically_same_vector(vectors: list) -> bool:
     for v in vectors[1:]:
         if not (abs(v[0] - ref[0]) <= tolerance and abs(v[1] - ref[1]) <= tolerance):
             return False
+    return True
+
+
+def is_between_edges(edges: list, vector: tuple) -> bool:
+    prev = edges[0]
+    next = edges[1]
+    angle_between_edges = round(angle_from_points(tuple(next.coords[0]), tuple(next.coords[0]), tuple(prev.coords[0])), 1)
+    vector_angle = round(angle_from_points(tuple(next.coords[1]), vector[0], vector[1]), 1)
+    if vector_angle == 0 or vector_angle >= angle_between_edges:
+        return False
     return True
 
 

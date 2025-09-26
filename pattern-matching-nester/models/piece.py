@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
 from svgpathtools import Path, Line, Arc, CubicBezier, QuadraticBezier
 from shapely.geometry import Polygon
 
@@ -13,7 +13,7 @@ class Piece:
             index: Unique identifier for the piece
             name: GarmentCode name (two names separated by a + in case of merged piece)
             path: SVG path object
-            unit_scale: Scale factor for converting path units
+            unit_scale: Scale factor for converting path units (target: cm)
             _original_pieces: Copies of the Pieces merged into this one (in case of merged piece)
         """
         self.index = index
@@ -46,7 +46,7 @@ class Piece:
         Converts a SVG path into:
         - original_vertices: anchor points from the SVG path
         - vertices: polygon with sampled points
-        - vertex_mapping: {original_index: polygon_index}
+        - vertex_mapping: {original_index: polygon_index}, used for updating seam information
 
         base_resolution: target spacing between points (in cm)\n
         min_samples / max_samples: limits on sampling granularity

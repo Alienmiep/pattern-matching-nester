@@ -21,7 +21,7 @@ from export_svg import export_full_pattern
 
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
+SVG_FILE = os.path.join(os.getcwd(), "data", "pants_with_seams.svg")
 MERGE_PIECES = True
 MERGE_SLEEVES = True
 ALLOWED_CLASS_LISTS = []
