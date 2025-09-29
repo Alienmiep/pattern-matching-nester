@@ -59,6 +59,13 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
 
         print(intersection)
 
+        if isinstance(intersection, Polygon) and intersection.area < INTERSECTION_PRECISION:
+            print("sufficiently small area detected")
+            b_poly_shifted = helper.separate(a_poly, b_poly, 0.1 * INTERSECTION_PRECISION, 1)
+            b_poly = orient_polygons(set_precision(b_poly_shifted, INTERSECTION_PRECISION))
+            b_poly_edges = helper.get_edges(b_poly)
+            intersection = helper.precision_aware_intersection(a_poly, b_poly)
+
         try:
             shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
         except Exception:
