@@ -245,7 +245,7 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
         # print("NFP: ", nfp)
         nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-        if len(nfp) > 100:  # safety mechanism
+        if len(nfp) > 120:  # safety mechanism
             nfp_is_closed_loop = True
 
     is_valid = False

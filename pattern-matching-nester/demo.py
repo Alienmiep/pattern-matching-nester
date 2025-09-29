@@ -21,9 +21,9 @@ from export_svg import export_full_pattern
 
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "data", "pants_with_seams.svg")
-MERGE_PIECES = True
-MERGE_SLEEVES = True
+SVG_FILE = os.path.join(os.getcwd(), "data", "fitted_skirt_with_seams.svg")
+MERGE_PIECES = False
+MERGE_SLEEVES = False
 ALLOWED_CLASS_LISTS = []
 
 # fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]

@@ -56,6 +56,9 @@ def handle_intersection(intersection):
         shared_points.extend(list(intersection.geoms))
 
     elif intersection.geom_type in ["LineString", "MultiLineString"]:
+        if intersection.length < 1.1 * INTERSECTION_PRECISION:
+            shared_points.append(Point(intersection.coords[0]))
+        else:
         line_intersection_flag = True
         merged_linestring = line_merge(intersection)
 
@@ -110,7 +113,7 @@ def incident_edges(polygon: Polygon, point: Point) -> list:
     edges = []
     for i in range(len(coords) - 1):  # skip closing segment
         edge = LineString([coords[i], coords[i + 1]])
-        if edge.distance(point) <= INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
+        if edge.distance(point) <= 1.1 * INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
             edges.append(edge)
     return edges
 
@@ -136,7 +139,7 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
 
     inter = precision_aware_intersection(precise_edge_a, precise_edge_b)
     # fun fact! sometimes the intersection isn't a Point, but rather a LineString with length 0.0010000000000012221 :)
-    if isinstance(inter, LineString) and inter.length < 2 * INTERSECTION_PRECISION:
+    if isinstance(inter, LineString) and inter.length < 2 * INTERSECTION_PRECISION and not inter.is_empty:
         inter = Point(inter.coords[0])
 
     if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
@@ -533,5 +536,5 @@ def generate_debug_output(translation_vectors, edge_pairs, a_poly=None, b_poly=N
                      length_includes_head=True)
 
     ax.set_aspect("equal", "box")
-    plt.savefig(filename, dpi=200)
+    plt.savefig(filename, dpi=600)
     plt.close(fig)
