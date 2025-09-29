@@ -1,7 +1,8 @@
 from itertools import product
 
 from shapely import set_precision, orient_polygons
-from shapely.geometry import Polygon, LineString
+from shapely.ops import nearest_points
+from shapely.geometry import Polygon
 from shapely.affinity import translate
 
 import helper as helper
@@ -38,7 +39,23 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
         line_intersection_flag = False
         intersection = helper.precision_aware_intersection(a_poly, b_poly)
         if intersection.is_empty:
-            raise Exception("Polygons are not touching")
+            # find out if the pieces are *almost* touching, which can happen due to floating point math
+            distance = a_poly.distance(b_poly)
+            if distance > 1.5 * INTERSECTION_PRECISION:
+                raise Exception("Polygons are not touching")
+
+            print("sufficiently small distance detected")
+            pa, pb = nearest_points(a_poly, b_poly)
+            dx, dy = pa.x - pb.x, pa.y - pb.y
+            norm = (dx**2 + dy**2)**0.5
+            ux, uy = dx / norm, dy / norm
+            ox, oy = distance * ux, distance * uy
+            b_poly_shifted = translate(b_poly, xoff=ox, yoff=oy)
+            b_poly = orient_polygons(set_precision(b_poly_shifted, INTERSECTION_PRECISION))
+            b_poly_edges = helper.get_edges(b_poly)
+            intersection = helper.precision_aware_intersection(a_poly, b_poly)
+            if intersection.is_empty:
+                raise Exception("Polygons are not touching after floating-point correction")
 
         print(intersection)
 
