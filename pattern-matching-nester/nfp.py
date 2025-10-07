@@ -42,6 +42,7 @@ def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
             # find out if the pieces are *almost* touching, which can happen due to floating point math
             distance = a_poly.distance(b_poly)
             if distance > 1.5 * INTERSECTION_PRECISION:
+                helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
                 raise Exception("Polygons are not touching")
 
             print("sufficiently small distance detected")

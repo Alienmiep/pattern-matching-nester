@@ -21,8 +21,8 @@ from export_svg import export_full_pattern
 
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "data", "fitted_skirt_with_seams.svg")
-MERGE_PIECES = False
+SVG_FILE = os.path.join(os.getcwd(), "data", "male_pants_with_seams.svg")
+MERGE_PIECES = True
 MERGE_SLEEVES = False
 ALLOWED_CLASS_LISTS = []
 
@@ -403,34 +403,33 @@ class PolygonViewer(QMainWindow):
             # reference points are relative to the NFP and one piece can have multiple for the different NFPs
 
             affected_seams = get_shared_seams_with_placed_pieces(self.current_piece, self.placed_pieces)
-            if any([x.matchable for x in affected_seams]):
-                # TODO get first matchable seam
-                pass
-            else:
-                current_seam = affected_seams[0]
+            if affected_seams:
 
-            # goal here: select a good reference point on the current (= orbiting) piece
-            seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
-            partner_seampart = current_seam.seamparts[1] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[0]  # the other one
-            reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
-            self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
-            print("current piece vertices", self.current_piece.vertices)
-            print("current piece reference point", self.current_piece.reference_point)
+                if any([x.matchable for x in affected_seams]):
+                    # TODO get first matchable seam
+                    pass
+                else:
+                    current_seam = affected_seams[0]
+                # goal here: select a good reference point on the current (= orbiting) piece
+                seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
+                partner_seampart = current_seam.seamparts[1] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[0]  # the other one
+                reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
+                self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
+                print("current piece vertices", self.current_piece.vertices)
+                print("current piece reference point", self.current_piece.reference_point)
 
-            partner_piece = full_pattern.get_piece_by_name(partner_seampart.part)
-            if self.current_piece.reference_point == self.current_piece.vertices[seampart_current_piece.start]:
-                partner_reference_point = partner_piece.vertices[partner_seampart.start]
-            else:
-                partner_reference_point = partner_piece.vertices[partner_seampart.end]
-            self.shapes["highlighted_seams"] = self.make_highlightable_seam(current_seam)
-            # if FABRIC_STRIPE_SWITCH:
-            #     self.offset = partner_reference_point[1] % stripe_spacing
-            #     self.target_lines = generate_stripe_segments(None, self.offset)
+                partner_piece = full_pattern.get_piece_by_name(partner_seampart.part)
+                if self.current_piece.reference_point == self.current_piece.vertices[seampart_current_piece.start]:
+                    partner_reference_point = partner_piece.vertices[partner_seampart.start]
+                else:
+                    partner_reference_point = partner_piece.vertices[partner_seampart.end]
+                self.shapes["highlighted_seams"] = self.make_highlightable_seam(current_seam)
+            else:  # pieces don't share any seams, so just pick any suitable vertex
+                self.current_piece.reference_point = select_reference_point(self.current_piece.vertices, self.current_piece, self.placed_pieces)
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
         self.points_of_interest = [self.current_piece.reference_point]
 
-        # TODO highlight seam pair
         self.draw_everything()
 
     def draw_everything(self) -> None:

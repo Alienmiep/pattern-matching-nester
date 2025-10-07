@@ -69,9 +69,12 @@ def handle_intersection(intersection):
 
         elif merged_linestring.geom_type == "MultiLineString":
             for line in merged_linestring.geoms:
+                    linestring_intersection_length += line.length
+                    if line.length < 2.1 * INTERSECTION_PRECISION:
+                        shared_points.append(Point(line.coords[0]))
+                    else:
                 shared_points.append(Point(line.coords[0]))
                 shared_points.append(Point(line.coords[-1]))
-                linestring_intersection_length += line.length
 
     elif intersection.geom_type in ["Polygon", "MultiPolygon"]:
         raise Exception("Polygons seem to overlap")
@@ -113,9 +116,18 @@ def incident_edges(polygon: Polygon, point: Point) -> list:
     edges = []
     for i in range(len(coords) - 1):  # skip closing segment
         edge = LineString([coords[i], coords[i + 1]])
-        if edge.distance(point) <= 1.1 * INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
+        if edge.distance(point) <= 2.1 * INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
             edges.append(edge)
     return edges
+
+
+def is_close_to_endpoints(shared_point, endpoints_b, tol):
+    for x, y in endpoints_b:
+        print(math.hypot(shared_point.x - x, shared_point.y - y))
+        if math.hypot(shared_point.x - x, shared_point.y - y) <= tol:
+            print("points close enough")
+            return True
+    return False
 
 
 def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
@@ -148,8 +160,10 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
     elif isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_b:
         return 3
 
-    elif isinstance(inter, LineString):
-        return 2 if (shared_point.x, shared_point.y) in endpoints_b else 3
+    elif isinstance(inter, LineString) or isinstance(inter, MultiLineString):
+        close = is_close_to_endpoints(shared_point, endpoints_b, 2.1 * INTERSECTION_PRECISION)
+        print("close: ", close)
+        return 2 if close else 3
 
     return 0
 
@@ -205,7 +219,7 @@ def is_left_or_right(edge_a_imprecise: LineString, edge_b_imprecise: LineString)
     angle = angle_from_points(point_a, point_b, point_c)
     if angle > 180:
         return "left"
-    if angle == 180 or (angle <= 0.5 and angle >= -0.5):
+    if angle == 180 or (angle <= 0.4 and angle >= -0.4):
         return "parallel"
     return "right"
 
@@ -232,7 +246,9 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_position: str) ->
 
 def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     shared_vertex = (pair.shared_vertex.x, pair.shared_vertex.y)
-    translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
+    translation_vector_endpoint = (
+        round(pair.shared_vertex.x + translation_vector[0], NO_OF_ROUNDING_DIGITS),
+        round(pair.shared_vertex.y + translation_vector[1], NO_OF_ROUNDING_DIGITS))
     translation_vector_linestring = LineString([shared_vertex, translation_vector_endpoint])
     # print(translation_vector_linestring)
 
@@ -522,7 +538,7 @@ def generate_debug_output(translation_vectors, edge_pairs, a_poly=None, b_poly=N
         x_b, y_b = ep.edge_b.xy
         ax.plot(x_a, y_a, color="red", linewidth=1, label="edge_a")
         ax.plot(x_b, y_b, color="green", linewidth=1, label="edge_b")
-        ax.plot(ep.shared_vertex.x, ep.shared_vertex.y, "ko")  # black point
+        # ax.plot(ep.shared_vertex.x, ep.shared_vertex.y, "ko")  # black point
 
      # get all unique anchors (shared vertices)
     anchors = {(round(ep.shared_vertex.x, 8), round(ep.shared_vertex.y, 8)) for ep in edge_pairs}
