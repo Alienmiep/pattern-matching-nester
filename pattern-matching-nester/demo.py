@@ -8,7 +8,7 @@ from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF, pyqtSignal
 from copy import deepcopy
 
-from shapely import Polygon, LineString, MultiLineString, set_precision
+from shapely import Polygon, LineString, MultiLineString, set_precision, GeometryCollection
 from shapely.geometry import box
 
 from models.piece import Piece
@@ -21,7 +21,7 @@ from export_svg import export_full_pattern
 
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "data", "male_pants_with_seams.svg")
+SVG_FILE = os.path.join(os.getcwd(), "data", "fitted_skirt_with_seams.svg")
 MERGE_PIECES = True
 MERGE_SLEEVES = False
 ALLOWED_CLASS_LISTS = []
@@ -346,6 +346,10 @@ class PolygonViewer(QMainWindow):
         side_layout.addWidget(self.clear_ifp_nfp_button)
         self.clear_ifp_nfp_button.clicked.connect(self.clear_ifp_nfp)
 
+        self.show_hull_button = QPushButton("Show convex hull")
+        side_layout.addWidget(self.show_hull_button)
+        self.show_hull_button.clicked.connect(self.show_hull)
+
         self.export_cutting_layout_button = QPushButton("Export cutting layout")
         side_layout.addWidget(self.export_cutting_layout_button)
         self.export_cutting_layout_button.clicked.connect(self.export_layout)
@@ -442,6 +446,11 @@ class PolygonViewer(QMainWindow):
             self.scene.addItem(item)
         for key, shape in self.shapes.items():
             if "color" in key or "seams" in key:
+                continue
+            if "hull" in key:
+                shape_path = vertices_to_qpainterpath(shape)
+                item = PathItem(shape_path, {"color": "#960000"}, viewer=self)
+                self.scene.addItem(item)
                 continue
             shape_path = vertices_to_qpainterpath(shape)
             attributes = {"color": self.shapes[f"{key}_color"]} if f"{key}_color" in self.shapes else {}
@@ -548,6 +557,24 @@ class PolygonViewer(QMainWindow):
                 qp_path.lineTo(vertex[0], vertex[1])
 
         return qp_path
+
+    def show_hull(self) -> None:
+        polys = []
+        pattern_piece_area = 0
+        for piece in self.placed_pieces:
+            poly = Polygon(piece.vertices)
+            pattern_piece_area = pattern_piece_area + poly.area
+            polys.append(poly)
+        union = GeometryCollection(polys)
+        hull = union.convex_hull
+        efficiency = pattern_piece_area / hull.area
+        print("Convex hull area:", hull.area)
+        print("Sum of piece areas:", pattern_piece_area)
+        print("Efficiency:", efficiency)
+
+        self.shapes["hull"] = list(hull.exterior.coords)
+        self.draw_everything()
+
 
     def export_layout(self) -> None:
         export_full_pattern(Pattern(self.placed_pieces, final_seams), "cutting_layout.svg")
