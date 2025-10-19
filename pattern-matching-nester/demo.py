@@ -549,7 +549,10 @@ class PolygonViewer(QMainWindow):
         all_pieces = self.pieces + self.placed_pieces + [self.current_piece]
         for seampart in seam.seamparts:
             part = get_piece_by_name(seampart.part)
-            vertices = part.vertices[seampart.start:seampart.end + 1]  if seampart.start < seampart.end else part.vertices[seampart.end:seampart.start + 1]  # TODO handle wrap-around
+            if seampart.start < seampart.end:
+                vertices = part.vertices[seampart.start:seampart.end + 1]
+            else:
+                vertices = part.vertices[seampart.start:] + part.vertices[:seampart.end + 1]
 
             first_x, first_y = vertices[0]
             qp_path.moveTo(first_x, first_y)

@@ -59,22 +59,22 @@ def handle_intersection(intersection):
         if intersection.length < 1.1 * INTERSECTION_PRECISION:
             shared_points.append(Point(intersection.coords[0]))
         else:
-        line_intersection_flag = True
-        merged_linestring = line_merge(intersection)
+            line_intersection_flag = True
+            merged_linestring = line_merge(intersection)
 
-        if merged_linestring.geom_type == "LineString":
-            shared_points.append(Point(merged_linestring.coords[0]))
-            shared_points.append(Point(merged_linestring.coords[-1]))
-            linestring_intersection_length = merged_linestring.length
+            if merged_linestring.geom_type == "LineString":
+                shared_points.append(Point(merged_linestring.coords[0]))
+                shared_points.append(Point(merged_linestring.coords[-1]))
+                linestring_intersection_length = merged_linestring.length
 
-        elif merged_linestring.geom_type == "MultiLineString":
-            for line in merged_linestring.geoms:
-                    linestring_intersection_length += line.length
-                    if line.length < 2.1 * INTERSECTION_PRECISION:
-                        shared_points.append(Point(line.coords[0]))
-                    else:
-                shared_points.append(Point(line.coords[0]))
-                shared_points.append(Point(line.coords[-1]))
+            elif merged_linestring.geom_type == "MultiLineString":
+                for line in merged_linestring.geoms:
+                        linestring_intersection_length += line.length
+                        if line.length < 2.1 * INTERSECTION_PRECISION:
+                            shared_points.append(Point(line.coords[0]))
+                        else:
+                            shared_points.append(Point(line.coords[0]))
+                            shared_points.append(Point(line.coords[-1]))
 
     elif intersection.geom_type in ["Polygon", "MultiPolygon"]:
         raise Exception("Polygons seem to overlap")
