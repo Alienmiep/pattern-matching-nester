@@ -571,9 +571,11 @@ class PolygonViewer(QMainWindow):
         union = GeometryCollection(polys)
         hull = union.convex_hull
         efficiency = pattern_piece_area / hull.area
+        fabric_length = hull.bounds[2]
         print("Convex hull area:", hull.area)
         print("Sum of piece areas:", pattern_piece_area)
         print("Efficiency:", efficiency)
+        print("+++ Length of fabric required:", fabric_length)
 
         self.shapes["hull"] = list(hull.exterior.coords)
         self.draw_everything()
