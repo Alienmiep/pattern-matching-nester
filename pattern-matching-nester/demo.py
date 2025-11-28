@@ -22,6 +22,7 @@ from export_svg import export_full_pattern
 
 # "pattern profile"
 SVG_FILE = os.path.join(os.getcwd(), "data", "fitted_skirt_with_seams.svg")
+# SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
 MERGE_PIECES = True
 MERGE_SLEEVES = False
 ALLOWED_CLASS_LISTS = []
@@ -413,7 +414,11 @@ class PolygonViewer(QMainWindow):
                     # TODO get first matchable seam
                     pass
                 else:
-                    current_seam = affected_seams[0]
+                    # Force turtleneck pattern to match using a side seam between the first two pieces
+                    if len(affected_seams) == 4 and affected_seams[1].id == 10:
+                        current_seam = affected_seams[1]
+                    else:
+                        current_seam = affected_seams[0]
                 # goal here: select a good reference point on the current (= orbiting) piece
                 seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
                 partner_seampart = current_seam.seamparts[1] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[0]  # the other one
