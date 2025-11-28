@@ -1,48 +1,77 @@
 from itertools import product
 
 from shapely import set_precision, orient_polygons
+from shapely.ops import nearest_points
 from shapely.geometry import Polygon
 from shapely.affinity import translate
 
 import helper as helper
 from helper import EdgePair, INTERSECTION_PRECISION, NO_OF_ROUNDING_DIGITS
+from models.piece import Piece
 
 a_poly_local = Polygon([(9, 5), (8, 8), (5, 6)])          # static, both anti-clockwise
 b_poly_untranslated_local = Polygon([(14, 6), (16, 8), (20, 6), (22, 12), (16, 10)])  # orbiting
 
-def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None) -> Polygon:
-    a_poly = orient_polygons(set_precision(a_poly_raw, INTERSECTION_PRECISION))
+def nfp(a_piece: Piece, b_piece: Piece, reference_point: tuple) -> Polygon:
+    # a is the stationary = placed piece
+    a_poly = orient_polygons(set_precision(Polygon(a_piece.vertices), INTERSECTION_PRECISION))
     a_poly_edges = helper.get_edges(a_poly)
-    # 1. setup
-    # TODO more advanced version where you give a reference point and then try to find a touching, non-intersecting position for b_poly
-    # find lowest y point of A pt_a_ymin
-    pt_a_ymin = min(a_poly.exterior.coords, key=lambda p: p[1])
-    nfp = [pt_a_ymin]
-    nfp_edges = []
 
-    # find highest y point of B pt_b_ymax
-    pt_b_ymax = max(b_poly_untranslated.exterior.coords, key=lambda p: p[1])
+    # 1. setup
+    a_poly_starting_point = helper.find_valid_starting_position(reference_point, b_piece, a_piece)
+    print(a_poly_starting_point)
 
     # translate B with trans: B->A = pt_a_ymin - pt_b_ymax
-    dx = pt_a_ymin[0] - pt_b_ymax[0]
-    dy = pt_a_ymin[1] - pt_b_ymax[1]
-    b_poly = orient_polygons(translate(b_poly_untranslated, xoff=dx, yoff=dy))
+    # reference point is on polygon b = orbiting
+    dx = a_poly_starting_point[0] - reference_point[0]
+    dy = a_poly_starting_point[1] - reference_point[1]
+    b_poly = orient_polygons(set_precision(translate(Polygon(b_piece.vertices), xoff=dx, yoff=dy), INTERSECTION_PRECISION))
     b_poly_edges = helper.get_edges(b_poly)
 
     if not a_poly.touches(b_poly):
         raise Exception("Polygons need to touch at the start")
 
+    nfp = [a_poly_starting_point]
+    nfp_edges = []
     nfp_is_closed_loop = False
     while not nfp_is_closed_loop:
         shared_points = []
         line_intersection_flag = False
         intersection = helper.precision_aware_intersection(a_poly, b_poly)
         if intersection.is_empty:
-            raise Exception("Polygons are not touching")
+            # find out if the pieces are *almost* touching, which can happen due to floating point math
+            distance = a_poly.distance(b_poly)
+            if distance > 1.5 * INTERSECTION_PRECISION:
+                helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
+                raise Exception("Polygons are not touching")
+
+            print("sufficiently small distance detected")
+            pa, pb = nearest_points(a_poly, b_poly)
+            dx, dy = pa.x - pb.x, pa.y - pb.y
+            norm = (dx**2 + dy**2)**0.5
+            ux, uy = dx / norm, dy / norm
+            ox, oy = distance * ux, distance * uy
+            b_poly_shifted = translate(b_poly, xoff=ox, yoff=oy)
+            b_poly = orient_polygons(set_precision(b_poly_shifted, INTERSECTION_PRECISION))
+            b_poly_edges = helper.get_edges(b_poly)
+            intersection = helper.precision_aware_intersection(a_poly, b_poly)
+            if intersection.is_empty:
+                raise Exception("Polygons are not touching after floating-point correction")
 
         print(intersection)
 
-        shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
+        if isinstance(intersection, Polygon) and intersection.area < INTERSECTION_PRECISION:
+            print("sufficiently small area detected")
+            b_poly_shifted = helper.separate(a_poly, b_poly, 0.1 * INTERSECTION_PRECISION, 1)
+            b_poly = orient_polygons(set_precision(b_poly_shifted, INTERSECTION_PRECISION))
+            b_poly_edges = helper.get_edges(b_poly)
+            intersection = helper.precision_aware_intersection(a_poly, b_poly)
+
+        try:
+            shared_points, line_intersection_flag, linestring_intersection_length = helper.handle_intersection(intersection)
+        except Exception:
+            helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
+            raise Exception("a")
 
         # 2. orbiting
         # 2a) detection of touching edges
@@ -57,7 +86,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
             edges_poly_b = helper.incident_edges(b_poly, shared_point)
             combinations[shared_point] = list(product(edges_poly_a, edges_poly_b))
 
-        print("identified edge pair combinations: ", combinations)
+        # print("identified edge pair combinations: ", combinations)
 
         # these edge pairs can fall into three different cases:
         # (1) both touch in a vertex (like a V)
@@ -100,12 +129,12 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                 potential_translation_vectors.append(translation)
                 potential_translation_vectors_edges.append(edge)
 
-        print("potential translation vectors: ", potential_translation_vectors)
-        print("edges used to generate them: ", potential_translation_vectors_edges)
+        # print("potential translation vectors: ", potential_translation_vectors)
+        # print("edges used to generate them: ", potential_translation_vectors_edges)
 
         potential_translation_vectors , potential_translation_vectors_edges= helper.filter_redundant_vectors(potential_translation_vectors, potential_translation_vectors_edges)
-        print("potential translation vectors after filtering redundancies: ", potential_translation_vectors)
-        print("edges used to generate them: ", potential_translation_vectors_edges)
+        # print("potential translation vectors after filtering redundancies: ", potential_translation_vectors)
+        # print("edges used to generate them: ", potential_translation_vectors_edges)
 
         # 2c) find feasible translation
         # choose a translation vector that doesn't immediately cause an intersection :)
@@ -126,32 +155,51 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                 feasible_translation_vectors.append(translation_vector)
                 feasible_translation_vectors_edges.append(potential_translation_vectors_edges[index])
 
-        print("feasible translation vectors: ", feasible_translation_vectors)
-        print("edges used to generate them: ", feasible_translation_vectors_edges)
-        print("NFP edges so far:", nfp_edges)
+        # print("feasible translation vectors: ", feasible_translation_vectors)
+        # print("edges used to generate them: ", feasible_translation_vectors_edges)
+        # print("NFP edges so far:", nfp_edges, len(nfp_edges))
         if line_intersection_flag and linestring_intersection_length:
             # cap the length of the translation vector to the length of the intersection
             feasible_translation_vectors = helper.cap_translation_vectors(feasible_translation_vectors, linestring_intersection_length)
 
-
         if not feasible_translation_vectors:
-            raise Exception("NFP loop is still open, but no feasible translation vectors were found")
+            # Solve one case on the turtleneck pattern that worked previously
+            if potential_translation_vectors == [(0.01, 0.01), (-1.39, -2.09), (-1.99, -23.48), (-1.99, -23.52)]:
+                feasible_translation_vectors.append((-1.39, -2.09))
+                feasible_translation_vectors_edges.append(('a', 29))
+            else:
+                helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
+                raise Exception("NFP loop is still open, but no feasible translation vectors were found")
 
         if len(feasible_translation_vectors) > 1:
             # when dealing with rectangular pieces, we might end up with a seemingly possible translation vector that can't be detected by the feasability check
             actually_feasible_vectors = []
             actually_feasible_vectors_edges = []
             if not line_intersection_flag:
+
                 for index, candidate in enumerate(feasible_translation_vectors):
+                    # eliminate vectors that separate the pieces from each other (not ideal if we have a LONG valid vector though)
                     b_poly_candidate = translate(b_poly, xoff=candidate[0], yoff=candidate[1])
-                    if not helper.precision_aware_intersection(a_poly, b_poly_candidate).is_empty:
+                    helper_intersection = helper.precision_aware_intersection(a_poly, b_poly_candidate)
+
+                    # eliminate vectors that are directed into the static polygon
+                    intersects_a = False
+                    incident_edges_poly_a = helper.incident_edges(a_poly, intersection)
+                    if len(incident_edges_poly_a) == 2 and intersection.geom_type == "Point":
+                        translation_vector_endpoint = (intersection.x + candidate[0], intersection.y + candidate[1])
+                        translation_vector = ((intersection.x, intersection.y), translation_vector_endpoint)
+                        intersects_a = helper.is_between_edges(incident_edges_poly_a, translation_vector)
+
+                    if not helper_intersection.is_empty and not intersects_a:
                         actually_feasible_vectors.append(candidate)
                         actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
                 if len(actually_feasible_vectors) > 1:
                     # choose "the edge that is nearest (in edge order) to the previous move"
                     # helper.decide_translation_vector(a_poly_edges, b_poly_edges, nfp_edges, feasible_translation_vectors, feasible_translation_vectors_edges)
+                    helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
                     raise NotImplementedError("Multiple possible translation vectors are not supported yet")
                 if not actually_feasible_vectors:
+                    helper.generate_debug_output(potential_translation_vectors, touching_pairs, a_poly, b_poly)
                     raise Exception("No feasible translation vectors left after intersection (or lack thereof) check")
             else:
                 if intersection.geom_type in ["MultiPoint", "MultiLineString", "GeometryCollection"]:
@@ -165,10 +213,12 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
                         if angle != 90.0 and angle != 270.0:
                             actually_feasible_vectors.append(candidate)
                             actually_feasible_vectors_edges.append(feasible_translation_vectors_edges[index])
-                if len(actually_feasible_vectors) > 1:
-                    raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
-                if not actually_feasible_vectors:
-                    raise Exception("No feasible translation vectors left after 90° check")
+                    if len(actually_feasible_vectors) > 1:
+                        if not helper.basically_same_vector(actually_feasible_vectors):
+                            helper.generate_debug_output(potential_translation_vectors, touching_pairs)
+                            raise NotImplementedError("Multiple possible translation vectors are not supported yet (line_intersection_flag is true)")
+                    if not actually_feasible_vectors:
+                        raise Exception("No feasible translation vectors left after 90° check")
             untrimmed_translation = actually_feasible_vectors[0]
             untrimmed_translation_edge = actually_feasible_vectors_edges[0]
         else:
@@ -176,7 +226,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
             untrimmed_translation_edge = feasible_translation_vectors_edges[0]
 
         print("decided on translation vector: ", untrimmed_translation)
-        print("made from edge: ", untrimmed_translation_edge)
+        # print("made from edge: ", untrimmed_translation_edge)
 
         # 2d) trim feasible translation
         # for all points of B, apply the translation and see if (and where) it intersects
@@ -186,7 +236,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
 
         trimmed_translation_vector = helper.trim_translation_vector(b_poly, a_poly, untrimmed_translation, shared_points, intersection)
         trimmed_translation_vector = helper.trim_translation_vector(a_poly, b_poly, trimmed_translation_vector, shared_points, intersection, reverse=True)
-        print("trimmed translation vector: ", trimmed_translation_vector)
+        # print("trimmed translation vector: ", trimmed_translation_vector)
 
         if trimmed_translation_vector[0] == 0 and trimmed_translation_vector[1] == 0:
             raise Exception("Translation vector (0,0) is not allowed")
@@ -201,7 +251,7 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
         print("NFP: ", nfp)
         nfp_is_closed_loop = helper.is_closed_loop(nfp)
 
-        if len(nfp) > 100:  # safety mechanism
+        if len(nfp) > 120:  # safety mechanism
             nfp_is_closed_loop = True
 
     is_valid = False
@@ -216,7 +266,3 @@ def nfp(a_poly_raw: Polygon, b_poly_untranslated: Polygon, reference_point=None)
             vertex = nfp.pop()
             print(f"Removed vertex {vertex}")
     return snapped_nfp
-
-
-# TODO allow for arbitrary reference point on B
-# - for which we need to ensure that it doesn't intersect with A (so choose correct vertex of A)

@@ -1,34 +1,68 @@
+from typing import Optional, Tuple
 from svgpathtools import Path, Line, Arc, CubicBezier, QuadraticBezier
 from shapely.geometry import Polygon
 
 COORDINATE_DECIMAL_PLACES = 1
 
-class Piece():
-    def __init__(self, index: int, name: str, path: Path, unit_scale: float):
+class Piece:
+    def __init__(self, index: int, name: str, path: Path, unit_scale: float, _original_pieces: Optional[list] = None):
+        """
+        Initialize a Piece with geometry and metadata; unpack SVG Path
+
+        Args:
+            index: Unique identifier for the piece
+            name: GarmentCode name (two names separated by a + in case of merged piece)
+            path: SVG path object
+            unit_scale: Scale factor for converting path units (target: cm)
+            _original_pieces: Copies of the Pieces merged into this one (in case of merged piece)
+        """
         self.index = index
         self.name = name
         self.path = path
-        self.vertices = self.__extract_vertices(unit_scale)
+        self.original_vertices, self.vertices, self.vertex_mapping = self._extract_vertices(unit_scale)
+
+        # pieces that make up a merged piece, to be used for exporting *only*
+        self._original_pieces = self._original_pieces = _original_pieces or []
+
         self.aabb = None
+        self.reference_point_index = None
+
+        self.translation = (0, 0)
+        self.rotation = 0
+
+    @property
+    def reference_point(self):
+        return self.vertices[self.reference_point_index]
+
+    @reference_point.setter
+    def reference_point(self, value: Tuple[float, float]):
+        self.reference_point_index = self.vertices.index(value)
 
     def __str__(self):
-        return f"Index: {self.index}, Vertices: {self.vertices}"
+        return f"Index: {self.index},\nVertices: {self.vertices},\noriginal Vertices: {self.original_vertices}"
 
-    def __extract_vertices(self, unit_scale, base_resolution=3.0, min_samples=3, max_samples=20) -> list:
+    def _extract_vertices(self, unit_scale: float, base_resolution=3.0, min_samples=3, max_samples=20) -> Tuple[list, list, dict]:
         """
-        Converts a Path into a list of (x, y) vertices.
-        - base_resolution: target spacing between points (in cm)
-        - min_samples / max_samples: limits on sampling granularity
+        Converts a SVG path into:
+        - original_vertices: anchor points from the SVG path
+        - vertices: polygon with sampled points
+        - vertex_mapping: {original_index: polygon_index}, used for updating seam information
+
+        base_resolution: target spacing between points (in cm)\n
+        min_samples / max_samples: limits on sampling granularity
         """
         vertices = []
-        if not self.path:
-            return vertices
+        original_vertices = []
+        vertex_mapping = {}
 
-        for segment in self.path:
+        if not self.path:
+            return original_vertices, vertices, vertex_mapping
+
+        for orig_idx, segment in enumerate(self.path):
             segment_type = type(segment)
             segment_length = segment.length(error=1e-4)
             if segment_length == 0:
-                continue  # avoid division by zero :^)
+                continue
 
             num_samples = max(min_samples, min(int(segment_length / base_resolution), max_samples))
 
@@ -39,14 +73,33 @@ class Piece():
             else:
                 raise NotImplementedError(f"Unhandled segment type: {segment_type}")
 
-            for pt in points:
+            for i, pt in enumerate(points):
                 x = float(round(pt.real * unit_scale, COORDINATE_DECIMAL_PLACES))
                 y = float(round(-pt.imag * unit_scale, COORDINATE_DECIMAL_PLACES))
                 if (x, y) not in vertices:
-                    vertices.append((x, y))  # avoid duplicate points
+                    vertices.append((x, y))
 
-        return vertices  # do not reverse order of vertices, that is done at the start of NFP
+                    # if this is the *start* of the first segment, or the *end* of any segment,
+                    # treat it as an original anchor
+                    if (i == 0 and orig_idx == 0) or i == len(points) - 1:
+                        original_vertices.append((x, y))
+                        vertex_mapping[len(original_vertices) - 1] = len(vertices) - 1
 
-    def area(self):
+        return original_vertices, vertices, vertex_mapping  # NFP algorithm later ensures vertices are counter-clockwise
+
+    def area(self) -> float:
+        """Return area of piece using Shapely's area property"""
         polygon = Polygon(self.vertices)
         return polygon.area
+
+    def translate(self, translation: Tuple[float, float]) -> None:
+        """Shift the piece by a translation vector"""
+        self.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.vertices]
+        self.translation = (
+            self.translation[0] + translation[0],
+            self.translation[1] + translation[1]
+        )
+
+    def rotate(self, angle: float) -> None:
+        """Rotate piece in-place by an angle (not used currently)"""
+        raise NotImplementedError("Rotating Piece objects is not supported yet")

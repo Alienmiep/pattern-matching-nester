@@ -6,312 +6,312 @@
         <id>1</id>
         <seampart>
           <part>left_turtle_front</part>
-          <start>9.625622648865935, 7.0</start>
-          <end>9.625622648865935, 0.0</end>
+          <start>0</start>
+          <end>1</end>
         </seampart>
         <seampart>
           <part>left_turtle_back</part>
-          <start>7.924626976951987, 0.0</start>
-          <end>7.924626976951987, 7.0</end>
+          <start>3</start>
+          <end>0</end>
         </seampart>
       </seam>
       <seam>
         <id>2</id>
         <seampart>
           <part>left_sleeve_f</part>
-          <start>52.585238816874444, 0.0</start>
-          <end>0.0, 0.0</end>
+          <start>0</start>
+          <end>1</end>
         </seampart>
         <seampart>
           <part>left_sleeve_b</part>
-          <start>0.010093572339975765, 0.0</start>
-          <end>52.59533238921442, 0.0</end>
+          <start>4</start>
+          <end>0</end>
         </seampart>
       </seam>
       <seam>
         <id>3</id>
         <seampart>
           <part>left_sleeve_f</part>
-          <start>13.585238816874444, 16.814431853239945</start>
-          <end>52.585238816874444, 13.451545482591957</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>left_sleeve_b</part>
-          <start>52.59533238921442, 13.45154548259198</start>
-          <end>13.59533238921442, 16.814431853239974</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
       </seam>
       <seam>
         <id>4</id>
         <seampart>
           <part>left_sleeve_f</part>
-          <start>0.0, 0.0</start>
-          <end>13.585238816874444, 16.814431853239945</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
         <seampart>
           <part>left_ftorso</part>
-          <start>25.0, 21.69877899971849</start>
-          <end>16.998647456366168, 2.5488211441107893</end>
+          <start>3</start>
+          <end>4</end>
         </seampart>
       </seam>
       <seam>
         <id>5</id>
         <seampart>
           <part>left_sleeve_b</part>
-          <start>0.0, 0.8438810856673093</start>
-          <end>0.010093572339975765, 0.0</end>
+          <start>3</start>
+          <end>4</end>
         </seampart>
         <seampart>
           <part>left_ftorso</part>
-          <start>16.998647456366168, 2.5488211441107893</start>
-          <end>17.0, 1.6751059804269488</end>
+          <start>4</start>
+          <end>5</end>
         </seampart>
       </seam>
       <seam>
         <id>6</id>
         <seampart>
           <part>left_sleeve_b</part>
-          <start>13.59533238921442, 16.814431853239974</start>
-          <end>0.0, 0.8438810856673093</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>left_btorso</part>
-          <start>17.0, 1.6751068138012997</start>
-          <end>20.0, 21.698779833092836</end>
+          <start>3</start>
+          <end>4</end>
         </seampart>
       </seam>
       <seam>
         <id>7</id>
         <seampart>
           <part>left_ftorso</part>
-          <start>7.499999999999997, 0.0</start>
-          <end>0.0, 5.091640417221015</end>
+          <start>6</start>
+          <end>7</end>
         </seampart>
         <seampart>
           <part>left_turtle_front</part>
-          <start>0.0, 7.0</start>
-          <end>9.625622648865935, 7.0</end>
+          <start>3</start>
+          <end>0</end>
         </seampart>
       </seam>
       <seam>
         <id>8</id>
         <seampart>
           <part>left_btorso</part>
-          <start>0.0, 2.2040872588558216</start>
-          <end>7.499999999999995, 0.0</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
         <seampart>
           <part>left_turtle_back</part>
-          <start>7.924626976951987, 7.0</start>
-          <end>0.0, 7.0</end>
+          <start>0</start>
+          <end>1</end>
         </seampart>
       </seam>
       <seam>
         <id>9</id>
         <seampart>
           <part>left_ftorso</part>
-          <start>17.0, 1.6751059804269488</start>
-          <end>7.499999999999997, 0.0</end>
+          <start>5</start>
+          <end>6</end>
         </seampart>
         <seampart>
           <part>left_btorso</part>
-          <start>7.499999999999995, 0.0</start>
-          <end>17.0, 1.6751068138012997</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
       </seam>
       <seam>
         <id>10</id>
         <seampart>
           <part>left_ftorso</part>
-          <start>25.0, 44.204087141094675</start>
-          <end>25.0, 21.69877899971849</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>left_btorso</part>
-          <start>20.0, 21.698779833092836</start>
-          <end>20.0, 44.20408749919405</end>
+          <start>4</start>
+          <end>5</end>
         </seampart>
       </seam>
       <seam>
         <id>11</id>
         <seampart>
-          <part>right_turtle_front</part>
-          <start>0.0, 0.0</start>
-          <end>0.0, 7.0</end>
+          <part>right_sleeve_f</part>
+          <start>3</start>
+          <end>0</end>
         </seampart>
         <seampart>
-          <part>right_turtle_back</part>
-          <start>0.0, 7.0</start>
-          <end>0.0, 0.0</end>
+          <part>right_sleeve_b</part>
+          <start>0</start>
+          <end>1</end>
         </seampart>
       </seam>
       <seam>
         <id>12</id>
         <seampart>
           <part>right_sleeve_f</part>
-          <start>52.585238816874444, 0.0</start>
-          <end>0.0, 0.0</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
         <seampart>
           <part>right_sleeve_b</part>
-          <start>0.0, 0.0</start>
-          <end>52.585238816874444, 0.0</end>
+          <start>3</start>
+          <end>4</end>
         </seampart>
       </seam>
       <seam>
         <id>13</id>
         <seampart>
-          <part>right_sleeve_f</part>
-          <start>0.0, 13.451545482591957</start>
-          <end>39.0, 16.814431853239945</end>
+          <part>right_turtle_front</part>
+          <start>3</start>
+          <end>0</end>
         </seampart>
         <seampart>
-          <part>right_sleeve_b</part>
-          <start>39.0, 16.814431853239974</start>
-          <end>0.0, 13.45154548259198</end>
+          <part>right_turtle_back</part>
+          <start>0</start>
+          <end>1</end>
         </seampart>
       </seam>
       <seam>
         <id>14</id>
         <seampart>
           <part>right_sleeve_f</part>
-          <start>39.0, 16.814431853239945</start>
-          <end>52.585238816874444, 0.0</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>right_ftorso</part>
-          <start>8.001352543633832, 2.5488211441107893</start>
-          <end>0.0, 21.69877899971849</end>
+          <start>4</start>
+          <end>5</end>
         </seampart>
       </seam>
       <seam>
         <id>15</id>
         <seampart>
           <part>right_sleeve_b</part>
-          <start>52.585238816874444, 0.0</start>
-          <end>52.59533238921442, 0.8438810856673093</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
         <seampart>
           <part>right_ftorso</part>
-          <start>8.0, 1.6751059804269488</start>
-          <end>8.001352543633832, 2.5488211441107893</end>
+          <start>3</start>
+          <end>4</end>
         </seampart>
       </seam>
       <seam>
         <id>16</id>
         <seampart>
           <part>right_sleeve_b</part>
-          <start>52.59533238921442, 0.8438810856673093</start>
-          <end>39.0, 16.814431853239974</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>right_btorso</part>
-          <start>0.0, 21.698779833092836</start>
-          <end>3.0, 1.6751068138012997</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
       </seam>
       <seam>
         <id>17</id>
         <seampart>
           <part>right_ftorso</part>
-          <start>25.0, 5.091640417221015</start>
-          <end>17.500000000000004, 0.0</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
         <seampart>
           <part>right_turtle_front</part>
-          <start>0.0, 7.0</start>
-          <end>9.625622648865935, 7.0</end>
+          <start>0</start>
+          <end>1</end>
         </seampart>
       </seam>
       <seam>
         <id>18</id>
         <seampart>
           <part>right_btorso</part>
-          <start>12.500000000000005, 0.0</start>
-          <end>20.0, 2.2040872588558216</end>
+          <start>4</start>
+          <end>5</end>
         </seampart>
         <seampart>
           <part>right_turtle_back</part>
-          <start>7.924626976951987, 7.0</start>
-          <end>0.0, 7.0</end>
+          <start>3</start>
+          <end>0</end>
         </seampart>
       </seam>
       <seam>
         <id>19</id>
         <seampart>
           <part>right_ftorso</part>
-          <start>17.500000000000004, 0.0</start>
-          <end>8.0, 1.6751059804269488</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>right_btorso</part>
-          <start>3.0, 1.6751068138012997</start>
-          <end>12.500000000000005, 0.0</end>
+          <start>3</start>
+          <end>4</end>
         </seampart>
       </seam>
       <seam>
         <id>20</id>
         <seampart>
           <part>right_ftorso</part>
-          <start>0.0, 21.69877899971849</start>
-          <end>0.0, 44.204087141094675</end>
+          <start>5</start>
+          <end>6</end>
         </seampart>
         <seampart>
           <part>right_btorso</part>
-          <start>0.0, 44.20408749919405</start>
-          <end>0.0, 21.698779833092836</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
       </seam>
       <seam>
         <id>21</id>
         <seampart>
           <part>right_ftorso</part>
-          <start>25.0, 44.204087141094675</start>
-          <end>25.0, 5.091640417221015</end>
+          <start>0</start>
+          <end>1</end>
         </seampart>
         <seampart>
           <part>left_ftorso</part>
-          <start>0.0, 5.091640417221015</start>
-          <end>0.0, 44.204087141094675</end>
+          <start>7</start>
+          <end>0</end>
         </seampart>
       </seam>
       <seam>
         <id>22</id>
         <seampart>
           <part>right_turtle_front</part>
-          <start>9.625622648865935, 7.0</start>
-          <end>9.625622648865935, 0.0</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
         <seampart>
           <part>left_turtle_front</part>
-          <start>0.0, 0.0</start>
-          <end>0.0, 7.0</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
       </seam>
       <seam>
         <id>23</id>
         <seampart>
           <part>right_btorso</part>
-          <start>20.0, 2.2040872588558216</start>
-          <end>20.0, 44.20408749919405</end>
+          <start>5</start>
+          <end>0</end>
         </seampart>
         <seampart>
           <part>left_btorso</part>
-          <start>0.0, 44.20408749919405</start>
-          <end>0.0, 2.2040872588558216</end>
+          <start>0</start>
+          <end>1</end>
         </seampart>
       </seam>
       <seam>
         <id>24</id>
         <seampart>
           <part>right_turtle_back</part>
-          <start>7.924626976951987, 0.0</start>
-          <end>7.924626976951987, 7.0</end>
+          <start>2</start>
+          <end>3</end>
         </seampart>
         <seampart>
           <part>left_turtle_back</part>
-          <start>0.0, 7.0</start>
-          <end>0.0, 0.0</end>
+          <start>1</start>
+          <end>2</end>
         </seampart>
       </seam>
     </seams>

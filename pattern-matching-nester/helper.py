@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from shapely import set_precision, line_merge
 from shapely.geometry import Polygon, Point, LineString, MultiLineString
 from shapely.ops import nearest_points
+from shapely.affinity import translate
+
+from models.piece import Piece
 
 INTERSECTION_PRECISION = 0.01
 NO_OF_ROUNDING_DIGITS = 2
@@ -16,6 +19,29 @@ class EdgePair:
     edge_b_index: int
     shared_vertex: Point
     edge_case: int
+
+def find_valid_starting_position(candidate: tuple, current_piece: Piece, piece: Piece) -> tuple:
+    current_piece_polygon = Polygon(current_piece.vertices)
+    piece_polygon = Polygon(piece.vertices)
+
+    # print("stationary piece", list(piece_polygon.exterior.coords))
+    # print(candidate)
+    for vertex in piece.vertices:
+        translation = vector_from_points(candidate, vertex)
+        # print("translation", translation)
+        # print("from:", candidate, vertex)
+        translated_current_piece = translate(current_piece_polygon, xoff=translation[0], yoff=translation[1])
+        # print("translated current piece", list(translated_current_piece.exterior.coords))
+        intersection = precision_aware_intersection(translated_current_piece, piece_polygon)
+        try:
+            _ = handle_intersection(intersection)
+            print(f"Found valid starting position {vertex}")
+            return vertex
+        except Exception:
+            # print(f"Vertex {vertex} does not work due to intersection {intersection}")
+            pass
+
+    return None
 
 
 def handle_intersection(intersection):
@@ -30,19 +56,25 @@ def handle_intersection(intersection):
         shared_points.extend(list(intersection.geoms))
 
     elif intersection.geom_type in ["LineString", "MultiLineString"]:
-        line_intersection_flag = True
-        merged_linestring = line_merge(intersection)
+        if intersection.length < 1.1 * INTERSECTION_PRECISION:
+            shared_points.append(Point(intersection.coords[0]))
+        else:
+            line_intersection_flag = True
+            merged_linestring = line_merge(intersection)
 
-        if merged_linestring.geom_type == "LineString":
-            shared_points.append(Point(merged_linestring.coords[0]))
-            shared_points.append(Point(merged_linestring.coords[-1]))
-            linestring_intersection_length = merged_linestring.length
+            if merged_linestring.geom_type == "LineString":
+                shared_points.append(Point(merged_linestring.coords[0]))
+                shared_points.append(Point(merged_linestring.coords[-1]))
+                linestring_intersection_length = merged_linestring.length
 
-        elif merged_linestring.geom_type == "MultiLineString":
-            for line in merged_linestring.geoms:
-                shared_points.append(Point(line.coords[0]))
-                shared_points.append(Point(line.coords[-1]))
-                linestring_intersection_length += line.length
+            elif merged_linestring.geom_type == "MultiLineString":
+                for line in merged_linestring.geoms:
+                        linestring_intersection_length += line.length
+                        if line.length < 2.1 * INTERSECTION_PRECISION:
+                            shared_points.append(Point(line.coords[0]))
+                        else:
+                            shared_points.append(Point(line.coords[0]))
+                            shared_points.append(Point(line.coords[-1]))
 
     elif intersection.geom_type in ["Polygon", "MultiPolygon"]:
         raise Exception("Polygons seem to overlap")
@@ -60,14 +92,42 @@ def handle_intersection(intersection):
     return shared_points, line_intersection_flag, linestring_intersection_length
 
 
+def separate(poly1, poly2, step, max_dist) -> Polygon:
+    c1 = poly1.centroid
+    c2 = poly2.centroid
+    dx, dy = c2.x - c1.x, c2.y - c1.y
+    norm = (dx**2 + dy**2)**0.5
+    ux, uy = dx/norm, dy/norm
+
+    shifted = poly2
+    last_intersecting = shifted
+    total_dist = 0.0
+
+    while shifted.intersects(poly1) and total_dist <= max_dist:
+        last_intersecting = shifted
+        shifted = translate(shifted, xoff=step*ux, yoff=step*uy)
+        total_dist += step
+
+    return last_intersecting
+
+
 def incident_edges(polygon: Polygon, point: Point) -> list:
     coords = list(polygon.exterior.coords)
     edges = []
     for i in range(len(coords) - 1):  # skip closing segment
         edge = LineString([coords[i], coords[i + 1]])
-        if edge.distance(point) <= INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
+        if edge.distance(point) <= 2.1 * INTERSECTION_PRECISION:  # Point-Edge intersection is too flaky, unfortunately
             edges.append(edge)
     return edges
+
+
+def is_close_to_endpoints(shared_point, endpoints_b, tol):
+    for x, y in endpoints_b:
+        print(math.hypot(shared_point.x - x, shared_point.y - y))
+        if math.hypot(shared_point.x - x, shared_point.y - y) <= tol:
+            print("points close enough")
+            return True
+    return False
 
 
 def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
@@ -90,14 +150,20 @@ def classify_edge_pair(edge_pair: tuple, shared_point: Point) -> int:
         return 2 if endpoint in endpoints_b else 3
 
     inter = precision_aware_intersection(precise_edge_a, precise_edge_b)
+    # fun fact! sometimes the intersection isn't a Point, but rather a LineString with length 0.0010000000000012221 :)
+    if isinstance(inter, LineString) and inter.length < 2 * INTERSECTION_PRECISION and not inter.is_empty:
+        inter = Point(inter.coords[0])
+
     if isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_a:
         return 2
 
     elif isinstance(inter, Point) and tuple(inter.coords)[0] not in endpoints_b:
         return 3
 
-    elif isinstance(inter, LineString):
-        return 2 if (shared_point.x, shared_point.y) in endpoints_b else 3
+    elif isinstance(inter, LineString) or isinstance(inter, MultiLineString):
+        close = is_close_to_endpoints(shared_point, endpoints_b, 2.1 * INTERSECTION_PRECISION)
+        print("close: ", close)
+        return 2 if close else 3
 
     return 0
 
@@ -153,7 +219,7 @@ def is_left_or_right(edge_a_imprecise: LineString, edge_b_imprecise: LineString)
     angle = angle_from_points(point_a, point_b, point_c)
     if angle > 180:
         return "left"
-    if angle == 180 or (angle <= 0.5 and angle >= -0.5):
+    if angle == 180 or (angle <= 0.4 and angle >= -0.4):
         return "parallel"
     return "right"
 
@@ -180,20 +246,25 @@ def get_edge_case(edge_a_part: str, edge_b_part: str, relative_position: str) ->
 
 def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
     shared_vertex = (pair.shared_vertex.x, pair.shared_vertex.y)
-    translation_vector_endpoint = (pair.shared_vertex.x + translation_vector[0], pair.shared_vertex.y + translation_vector[1])
+    translation_vector_endpoint = (
+        round(pair.shared_vertex.x + translation_vector[0], NO_OF_ROUNDING_DIGITS),
+        round(pair.shared_vertex.y + translation_vector[1], NO_OF_ROUNDING_DIGITS))
     translation_vector_linestring = LineString([shared_vertex, translation_vector_endpoint])
+    # print(translation_vector_linestring)
 
     match pair.edge_case:
         case 1:
             # the allowed range is the side of a that b is on, union with the side of b that a is not on
             # borders (="parallel") are allowed too
-            if pair.edge_a_index == 3:
-                pass
             allowed_side_a = is_left_or_right(pair.edge_a, pair.edge_b)
             allowed_side_b = is_left_or_right(pair.edge_b, pair.edge_a)
             location_a = is_left_or_right(pair.edge_a, translation_vector_linestring)
             location_b = is_left_or_right(pair.edge_b, translation_vector_linestring)
+            # print(allowed_side_a, allowed_side_b)
+            # print(location_a, location_b)
+            # print(translation_vector_endpoint)
             if allowed_side_a == "parallel" and allowed_side_b == "parallel":
+                # print("True due to both being parallel")
                 return True
 
             negated_side_b = "right" if allowed_side_b == "left" else "left"
@@ -201,26 +272,33 @@ def is_in_feasible_range(translation_vector: tuple, pair: EdgePair) -> bool:
         case 2:
             # side of a that b is on, but only use the part of a betweeen shared_vertex and its end
             trimmed_a = LineString([shared_vertex, (pair.edge_a.coords[1])])
+            # print(trimmed_a)
             if trimmed_a.length < INTERSECTION_PRECISION:
+                # print("True due to length")
                 return True
 
             allowed_side_a = is_left_or_right(trimmed_a, pair.edge_b)
             if allowed_side_a == "parallel":  # in cases 2 and 3 that means the two edges are laying on top of each other
+                # print("True due to being parallel")
                 return True
 
             location_a = is_left_or_right(trimmed_a, translation_vector_linestring)
+            # print(allowed_side_a, location_a)
             return location_a in [allowed_side_a, "parallel"]
         case 3:
             # side of b that a is not on, but only use the part of b betweeen shared_vertex and its end
             trimmed_b = LineString([shared_vertex, (pair.edge_b.coords[1])])
             if trimmed_b.length < INTERSECTION_PRECISION:
+                # print("True due to length")
                 return True
 
             disallowed_side_b = is_left_or_right(trimmed_b, pair.edge_a)
             if disallowed_side_b == "parallel":
+                # print("True due to being parallel")
                 return True
 
             location_b = is_left_or_right(trimmed_b, translation_vector_linestring)
+            # print(disallowed_side_b, location_b)
             return location_b != disallowed_side_b
 
 
@@ -360,7 +438,7 @@ def cap_translation_vectors(vectors: list, length: float) -> list:
             scale = length / vec_length
             vx *= scale
             vy *= scale
-        capped_vectors.append((vx, vy))
+        capped_vectors.append((round(vx, NO_OF_ROUNDING_DIGITS), round(vy, NO_OF_ROUNDING_DIGITS)))
     return capped_vectors
 
 # ----- more general helpers -----
@@ -416,3 +494,63 @@ def longest_vector(vectors: list) -> tuple:
             max_length = length
             longest_index = index
     return longest_index, vectors[longest_index]
+
+
+def basically_same_vector(vectors: list) -> bool:
+    if not vectors:
+        return False
+    ref = vectors[0]
+    tolerance = 1.1 * INTERSECTION_PRECISION
+    for v in vectors[1:]:
+        if not (abs(v[0] - ref[0]) <= tolerance and abs(v[1] - ref[1]) <= tolerance):
+            return False
+    return True
+
+
+def is_between_edges(edges: list, vector: tuple) -> bool:
+    prev = edges[0]
+    next = edges[1]
+    angle_between_edges = round(angle_from_points(tuple(next.coords[0]), tuple(next.coords[0]), tuple(prev.coords[0])), 1)
+    vector_angle = round(angle_from_points(tuple(next.coords[1]), vector[0], vector[1]), 1)
+    if vector_angle == 0 or vector_angle >= angle_between_edges:
+        return False
+    return True
+
+
+import matplotlib
+matplotlib.use("Agg")  # non-interactive backend
+import matplotlib.pyplot as plt
+
+def generate_debug_output(translation_vectors, edge_pairs, a_poly=None, b_poly=None, filename="debug.png"):
+    def plot_polygon(ax, poly, color, label):
+        x, y = poly.exterior.xy
+        ax.fill(x, y, alpha=0.5, fc=color, ec='black', label=label)
+
+    fig, ax = plt.subplots()
+    if a_poly:
+        plot_polygon(ax, a_poly, 'red', 'A Polygon')
+    if b_poly:
+        plot_polygon(ax, b_poly, 'green', 'B Polygon')
+
+    # plot edges
+    for ep in edge_pairs:
+        x_a, y_a = ep.edge_a.xy
+        x_b, y_b = ep.edge_b.xy
+        ax.plot(x_a, y_a, color="red", linewidth=1, label="edge_a")
+        ax.plot(x_b, y_b, color="green", linewidth=1, label="edge_b")
+        # ax.plot(ep.shared_vertex.x, ep.shared_vertex.y, "ko")  # black point
+
+     # get all unique anchors (shared vertices)
+    anchors = {(round(ep.shared_vertex.x, 8), round(ep.shared_vertex.y, 8)) for ep in edge_pairs}
+
+    # plot vectors from each anchor
+    for ax_x, ax_y in anchors:
+        for dx, dy in translation_vectors:
+            ax.arrow(ax_x, ax_y, dx, dy,
+                     head_width=0.5, head_length=1,
+                     fc="blue", ec="blue", alpha=0.7,
+                     length_includes_head=True)
+
+    ax.set_aspect("equal", "box")
+    plt.savefig(filename, dpi=600)
+    plt.close(fig)

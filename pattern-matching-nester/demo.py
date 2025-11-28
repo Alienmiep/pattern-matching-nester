@@ -2,12 +2,13 @@ import os
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QGraphicsView, QGraphicsScene, QGraphicsPathItem, QPushButton,
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextEdit, QGraphicsItem, QGraphicsEllipseItem
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextEdit, QGraphicsItem, QGraphicsEllipseItem, QSpinBox, QCheckBox
 )
 from PyQt5.QtGui import QPainterPath, QPen, QColor, QPainter
-from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtCore import Qt, QPointF, pyqtSignal
+from copy import deepcopy
 
-from shapely import Polygon, LineString, MultiLineString, set_precision
+from shapely import Polygon, LineString, MultiLineString, set_precision, GeometryCollection
 from shapely.geometry import box
 
 from models.piece import Piece
@@ -15,17 +16,20 @@ from models.pattern import Pattern
 from svg_helper import *
 from ifp import ifp
 from nfp import nfp
-from helper import INTERSECTION_PRECISION
+from helper import INTERSECTION_PRECISION, find_valid_starting_position
+from export_svg import export_full_pattern
+
 
 # "pattern profile"
-SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
+SVG_FILE = os.path.join(os.getcwd(), "data", "fitted_skirt_with_seams.svg")
+# SVG_FILE = os.path.join(os.getcwd(), "data", "turtleneck_with_seams.svg")
 MERGE_PIECES = True
-MERGE_SLEEVES = True
+MERGE_SLEEVES = False
 ALLOWED_CLASS_LISTS = []
 
-fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
-stripe_spacing = 10
-FABRIC_STRIPE_SWITCH = True
+# fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]
+# stripe_spacing = 10
+# FABRIC_STRIPE_SWITCH = False
 
 
 def vertices_to_qpainterpath(vertices: list) -> QPainterPath:
@@ -58,7 +62,7 @@ def bounding_box_from_polygon(poly_vertices: list) -> list:
     return list(bbox.exterior.coords)[:-1]  # cut off duplicate closing point
 
 
-def generate_stripe_segments(ifp: Polygon) -> list:
+def generate_stripe_segments(ifp: Polygon, fabric_vertices, stripe_spacing: bool, offset: float=0) -> list:
     if ifp is None:
         ifp = Polygon(fabric_vertices)
 
@@ -66,8 +70,8 @@ def generate_stripe_segments(ifp: Polygon) -> list:
 
      # Generate horizontal stripe lines
     stripe_lines = [
-        LineString([(x_min, y), (x_max, y)])
-        for y in range(int(y_min), int(y_max) + 1, stripe_spacing)
+        LineString([(x_min, y + offset), (x_max, y + offset)])
+        for y in range(int(y_min), int(y_max), stripe_spacing)
     ]
 
     # Intersect each line with the IFP and flatten results
@@ -81,6 +85,18 @@ def generate_stripe_segments(ifp: Polygon) -> list:
                 result.extend(intersection.geoms)
 
     return result
+
+
+def generate_line_texture(fabric_vertices: list, stripe_spacing: int) -> list:
+    xs, ys = zip(*fabric_vertices)
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+
+    stripe_lines = [
+        LineString([(x_min, y), (x_max, y)])
+        for y in range(int(y_min), int(y_max) + 1, stripe_spacing)
+    ]
+    return stripe_lines
 
 
 def stretch_rectangle(rect: Polygon, offsets: tuple) -> Polygon:
@@ -122,6 +138,35 @@ def simple_nfp(static_poly: Polygon, orbiting_poly: Polygon, reference_point: tu
     min_y_offset = maxy - reference_point[1]
     static_poly = stretch_rectangle(static_poly, (min_x_offset, max_x_offset, min_y_offset, max_y_offset))
     return static_poly
+
+
+def get_shared_seams_with_placed_pieces(current_piece: Piece, placed_pieces: list) -> list:
+    affected_seams = []
+    if placed_pieces:
+        for placed_piece in placed_pieces:
+            affected_seams.extend(full_pattern.find_seams_by_pair(current_piece.name, placed_piece.name))
+        print(f"Found {len(affected_seams)} affected seam(s)")
+    return affected_seams
+
+# seams between the first two parts:
+# [Seam(id=9, seamparts=[Seampart(part='left_ftorso', start=(17.0, 1.6751059804269488), end=(7.499999999999997, 0.0)), Seampart(part='left_btorso', start=(7.499999999999995, 0.0), end=(17.0, 1.6751068138012997))]),
+#  Seam(id=10, seamparts=[Seampart(part='left_ftorso', start=(25.0, 44.204087141094675), end=(25.0, 21.69877899971849)), Seampart(part='left_btorso', start=(20.0, 21.698779833092836), end=(20.0, 44.20408749919405))]),
+#  Seam(id=19, seamparts=[Seampart(part='right_ftorso', start=(17.500000000000004, 0.0), end=(8.0, 1.6751059804269488)), Seampart(part='right_btorso', start=(3.0, 1.6751068138012997), end=(12.500000000000005, 0.0))]),
+#  Seam(id=20, seamparts=[Seampart(part='right_ftorso', start=(0.0, 21.69877899971849), end=(0.0, 44.204087141094675)), Seampart(part='right_btorso', start=(0.0, 44.20408749919405), end=(0.0, 21.698779833092836))])]
+
+
+def select_reference_point(rp_candidates: list, current_piece: Piece, placed_pieces: list) -> tuple:
+    # idea: assume the first candidate (start of seam)
+    # check if a valid starting position can be found for each already placed piece
+    # if not, try again for the other candidate
+    # and if that one *also* doesn't work somehow, return an error so the program can try again with a different seam
+    for candidate in rp_candidates:
+        candidate_is_valid = True
+        for piece in placed_pieces:
+            candidate_is_valid = candidate_is_valid and bool(find_valid_starting_position(candidate, current_piece, piece))
+        if candidate_is_valid:
+            return candidate
+    raise NotImplementedError("Neither of the reference point candidates are valid")
 
 
 class PathItem(QGraphicsPathItem):
@@ -174,11 +219,81 @@ class ZoomableGraphicsView(QGraphicsView):
         self.scale(zoom, zoom)
 
 
+class FabricConfigWidget(QWidget):
+    applied = pyqtSignal(list, int, bool)  # fabric_vertices, stripe_spacing, stripe_enabled
+
+    def __init__(self, fabric_width, fabric_length, stripes_enabled, stripe_spacing):
+        super().__init__()
+        self.init_ui(fabric_width, fabric_length, stripes_enabled, stripe_spacing)
+
+    def init_ui(self, fabric_width, fabric_length, stripes_enabled, stripe_spacing):
+        layout = QVBoxLayout()
+
+        # Fabric width
+        width_layout = QHBoxLayout()
+        width_layout.addWidget(QLabel("Fabric Width (cm):"))
+        self.width_input = QSpinBox()
+        self.width_input.setRange(1, 1000)
+        self.width_input.setValue(fabric_width)
+        width_layout.addWidget(self.width_input)
+        layout.addLayout(width_layout)
+
+        # Fabric length
+        length_layout = QHBoxLayout()
+        length_layout.addWidget(QLabel("Fabric Length (cm):"))
+        self.length_input = QSpinBox()
+        self.length_input.setRange(1, 1000)
+        self.length_input.setValue(fabric_length)
+        length_layout.addWidget(self.length_input)
+        layout.addLayout(length_layout)
+
+        # Stripe switch
+        self.stripe_checkbox = QCheckBox("Enable Stripes")
+        self.stripe_checkbox.setChecked(stripes_enabled)
+        self.stripe_checkbox.stateChanged.connect(self.toggle_stripe_input)
+        layout.addWidget(self.stripe_checkbox)
+
+        # Stripe width
+        stripe_layout = QHBoxLayout()
+        stripe_layout.addWidget(QLabel("Stripe Spacing (cm):"))
+        self.stripe_input = QSpinBox()
+        self.stripe_input.setRange(1, 100)
+        self.stripe_input.setValue(stripe_spacing)
+        self.stripe_input.setEnabled(True)
+        stripe_layout.addWidget(self.stripe_input)
+        layout.addLayout(stripe_layout)
+
+        # Apply button
+        apply_button = QPushButton("Apply")
+        apply_button.clicked.connect(self.on_apply)
+        layout.addWidget(apply_button)
+
+        self.setLayout(layout)
+
+    def toggle_stripe_input(self, state):
+        self.stripe_input.setEnabled(state == 2)
+
+    def get_values(self):
+        width = self.width_input.value()
+        length = self.length_input.value()
+        fabric_vertices = [(0, 0), (length, 0), (length, width), (0, width)]
+        stripe_enabled = self.stripe_checkbox.isChecked()
+        stripe_spacing = self.stripe_input.value() if stripe_enabled else 0
+        return fabric_vertices, stripe_spacing, stripe_enabled
+
+    def on_apply(self):
+        fabric_vertices, stripe_spacing, stripe_enabled = self.get_values()
+        self.applied.emit(fabric_vertices, stripe_spacing, stripe_enabled)
+
 class PolygonViewer(QMainWindow):
     def __init__(self, pieces: list):
         super().__init__()
-        self.pieces = pieces
+        self.pieces_backup_copy = pieces
+        self.pieces = deepcopy(self.pieces_backup_copy)
         self.placed_pieces = []
+        self.fabric_vertices = [(0, 0), (200, 0), (200, 150), (0, 150)]  # default fabric size
+        self.stripes_enabled = True
+        self.stripe_spacing = 10
         self.setWindowTitle("Interactive Algorithm Demo")
         self.setGeometry(100, 100, 800, 600)
         self.showMaximized()
@@ -194,6 +309,10 @@ class PolygonViewer(QMainWindow):
         self.side_panel.setMinimumWidth(200)
         side_layout = QVBoxLayout()
         self.side_panel.setLayout(side_layout)
+        # Add fabric controls to side panel
+        self.fabric_controls = FabricConfigWidget(150, 200, self.stripes_enabled, self.stripe_spacing)
+        side_layout.addWidget(self.fabric_controls)
+        self.fabric_controls.applied.connect(self.update_fabric)
 
         # --- Graphics View ---
         self.view = ZoomableGraphicsView(self)
@@ -228,13 +347,23 @@ class PolygonViewer(QMainWindow):
         side_layout.addWidget(self.clear_ifp_nfp_button)
         self.clear_ifp_nfp_button.clicked.connect(self.clear_ifp_nfp)
 
+        self.show_hull_button = QPushButton("Show convex hull")
+        side_layout.addWidget(self.show_hull_button)
+        self.show_hull_button.clicked.connect(self.show_hull)
+
+        self.export_cutting_layout_button = QPushButton("Export cutting layout")
+        side_layout.addWidget(self.export_cutting_layout_button)
+        self.export_cutting_layout_button.clicked.connect(self.export_layout)
+
         # set up data structures
         self.shapes = {
-            "fabric": fabric_vertices
+            "fabric": self.fabric_vertices
         }
         self.points_of_interest = []
 
-        self.fabric_texture = generate_stripe_segments(None) if FABRIC_STRIPE_SWITCH else None
+        self.fabric_texture = generate_line_texture(self.fabric_vertices, self.stripe_spacing) if self.stripes_enabled else None
+        self.target_lines = []
+        self.offset = 0
         self.draw_everything()
 
     def fit_all(self) -> None:
@@ -245,8 +374,6 @@ class PolygonViewer(QMainWindow):
 
     def clear_ifp_nfp(self) -> None:
         self.__clear_ifp_nfp()
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def __clear_ifp_nfp(self) -> None:
@@ -257,7 +384,10 @@ class PolygonViewer(QMainWindow):
                 keys_to_remove.append(key)
         for key in keys_to_remove:
             self.shapes.pop(key)
+        if "highlighted_seams" in self.shapes:
+            self.shapes.pop("highlighted_seams")
         self.points_of_interest = []
+        self.target_lines = []
 
     def advance_piece(self) -> None:
         if not self.pieces:
@@ -267,24 +397,72 @@ class PolygonViewer(QMainWindow):
         self.current_piece: Piece = self.pieces.pop(0)
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.vertices
-        self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
+        if not self.placed_pieces:
+            self.current_piece.reference_point = min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))
+        else:
+            # see if the current piece shares any seams with previously placed pieces
+            # prioritize matchable seams
+            # select first seam, get 2 reference point pairs from it
+            # test both for viability (throw error if neither of them are AND we have a matchable seam)
+            # if there are no viable ones, find a different vertex on placed piece
+            # reference points are relative to the NFP and one piece can have multiple for the different NFPs
+
+            affected_seams = get_shared_seams_with_placed_pieces(self.current_piece, self.placed_pieces)
+            if affected_seams:
+
+                if any([x.matchable for x in affected_seams]):
+                    # TODO get first matchable seam
+                    pass
+                else:
+                    # Force turtleneck pattern to match using a side seam between the first two pieces
+                    if len(affected_seams) == 4 and affected_seams[1].id == 10:
+                        current_seam = affected_seams[1]
+                    else:
+                        current_seam = affected_seams[0]
+                # goal here: select a good reference point on the current (= orbiting) piece
+                seampart_current_piece = current_seam.seamparts[0] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[1]
+                partner_seampart = current_seam.seamparts[1] if self.current_piece.name in current_seam.seamparts[0].part else current_seam.seamparts[0]  # the other one
+                reference_point_candidates = [self.current_piece.vertices[seampart_current_piece.start], self.current_piece.vertices[seampart_current_piece.end]]
+                self.current_piece.reference_point = select_reference_point(reference_point_candidates, self.current_piece, self.placed_pieces)
+                print("current piece vertices", self.current_piece.vertices)
+                print("current piece reference point", self.current_piece.reference_point)
+
+                partner_piece = full_pattern.get_piece_by_name(partner_seampart.part)
+                if self.current_piece.reference_point == self.current_piece.vertices[seampart_current_piece.start]:
+                    partner_reference_point = partner_piece.vertices[partner_seampart.start]
+                else:
+                    partner_reference_point = partner_piece.vertices[partner_seampart.end]
+                self.shapes["highlighted_seams"] = self.make_highlightable_seam(current_seam)
+            else:  # pieces don't share any seams, so just pick any suitable vertex
+                self.current_piece.reference_point = select_reference_point(self.current_piece.vertices, self.current_piece, self.placed_pieces)
 
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
+        self.points_of_interest = [self.current_piece.reference_point]
 
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(None)
         self.draw_everything()
 
     def draw_everything(self) -> None:
         self.scene.clear()
         if self.fabric_texture:
             self.draw_texture()
+        if self.target_lines:
+            path = linestrings_to_qpainterpath(self.target_lines)
+            item = PathItem(path, {"color": "#ff0000"}, viewer=self)
+            self.scene.addItem(item)
         for key, shape in self.shapes.items():
-            if "color" in key:
+            if "color" in key or "seams" in key:
+                continue
+            if "hull" in key:
+                shape_path = vertices_to_qpainterpath(shape)
+                item = PathItem(shape_path, {"color": "#960000"}, viewer=self)
+                self.scene.addItem(item)
                 continue
             shape_path = vertices_to_qpainterpath(shape)
             attributes = {"color": self.shapes[f"{key}_color"]} if f"{key}_color" in self.shapes else {}
             item = PathItem(shape_path, attributes, viewer=self)
+            self.scene.addItem(item)
+        if "highlighted_seams" in self.shapes:
+            item = PathItem(self.shapes["highlighted_seams"], {"color": "#1dcc1d"}, viewer=self)
             self.scene.addItem(item)
 
         # Add vertex dot for interesting points
@@ -294,20 +472,22 @@ class PolygonViewer(QMainWindow):
 
     def draw_texture(self):
         texture_path = linestrings_to_qpainterpath(self.fabric_texture)
-        item = PathItem(texture_path, {"color": "#bbbbbb"}, viewer=self)
+        item = PathItem(texture_path, {"color": "#3e4bff"}, viewer=self)
         self.scene.addItem(item)
 
     def translate_current_piece(self, translation) -> None:
-        self.current_piece.vertices = [(x[0] + translation[0], x[1] + translation[1]) for x in self.current_piece.vertices]
+        self.current_piece.translate(translation)
         self.current_piece_vertices_draw = self.current_piece.vertices
         self.current_piece_vertices_calc = self.current_piece.vertices
         self.shapes[f"piece_{self.current_piece.index}"] = self.current_piece_vertices_draw
-        self.points_of_interest = [min(self.current_piece.vertices, key=lambda v: (v[0], v[1]))]
+        self.points_of_interest = [self.current_piece.reference_point]
 
     def show_ifp(self) -> None:
-        ifp_vertices = ifp(self.current_piece_vertices_calc, fabric_vertices)
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(Polygon(ifp_vertices))
+        ifp_vertices = ifp(self.current_piece, self.fabric_vertices)
+        if self.stripes_enabled and self.placed_pieces:
+            self.target_lines = generate_stripe_segments(Polygon(ifp_vertices), self.fabric_vertices, self.stripe_spacing)
+        else:
+            self.target_lines = []
         self.shapes["ifp"] = ifp_vertices
         self.shapes["ifp_color"] = "#FF0000"  # TODO rework this, the _color thing is a bit silly
         self.draw_everything()
@@ -326,32 +506,108 @@ class PolygonViewer(QMainWindow):
             self.fit_first_piece()
             return
 
-        reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
+        # reference_point_piece = min(self.current_piece_vertices_calc, key=lambda v: (v[0], v[1]))
         main_polygon = Polygon(self.shapes["ifp"])
-        polygons_to_subtract = [Polygon(x.vertices) for x in self.placed_pieces]
+        # polygons_to_subtract = [Polygon(x.vertices) for x in self.placed_pieces]
 
         result = main_polygon
-        for index, poly in enumerate(polygons_to_subtract):
-            nfp_poly = nfp(poly, Polygon(self.current_piece_vertices_calc), reference_point_piece)
+        for index, p in enumerate(self.placed_pieces):
+            nfp_poly = nfp(p, self.current_piece, self.current_piece.reference_point)  # b_poly used to be Polygon(self.current_piece_vertices_calc)
             self.shapes[f"nfp_{index}"] = list(nfp_poly.exterior.coords)
             self.shapes[f"nfp_{index}_color"] = "#0000FF"
             result_imprecise = result.difference(nfp_poly)
             result = set_precision(result_imprecise, INTERSECTION_PRECISION)
 
-        if FABRIC_STRIPE_SWITCH:
-            self.fabric_texture = generate_stripe_segments(result)
+        if self.stripes_enabled:
+            self.target_lines = generate_stripe_segments(result, self.fabric_vertices, self.stripe_spacing, self.offset)
             target_point = min(
-                (pt for line in self.fabric_texture for pt in line.coords),
+                (pt for line in self.target_lines for pt in line.coords),
                 key=lambda p: (p[0], p[1])
             )
         else:  # just use IFP corner
-            coords = list(result.exterior.coords)[:-1]
+            self.target_lines = []
+            if result.geom_type == "Polygon":
+                polygons = [result]
+            elif result.geom_type == "MultiPolygon":
+                polygons = list(result.geoms)
+            else:
+                raise TypeError("Unexpected geometry type: " + result.geom_type)
+
+            coords = []
+            for poly in polygons:
+                coords.extend(list(poly.exterior.coords)[:-1])
             target_point = min(coords, key=lambda p: (p[0], p[1]))
 
-        translation = (target_point[0] - reference_point_piece[0], target_point[1] - reference_point_piece[1])
+        translation = (target_point[0] - self.current_piece.reference_point[0], target_point[1] - self.current_piece.reference_point[1])
         self.translate_current_piece(translation)
         self.placed_pieces.append(self.current_piece)
         self.draw_everything()
+
+    def make_highlightable_seam(self, seam) -> QPainterPath:
+        def get_piece_by_name(name):
+            for p in all_pieces:
+                if p.name == name:
+                    return p
+            raise Exception(f"Piece {name} not found")
+        # Seam(id=9, seamparts=[Seampart(part='left_ftorso+right_ftorso', start=13, end=14), Seampart(part='left_btorso+right_btorso', start=3, end=4)], matchable=False)
+        qp_path = QPainterPath()
+        all_pieces = self.pieces + self.placed_pieces + [self.current_piece]
+        for seampart in seam.seamparts:
+            part = get_piece_by_name(seampart.part)
+            if seampart.start < seampart.end:
+                vertices = part.vertices[seampart.start:seampart.end + 1]
+            else:
+                vertices = part.vertices[seampart.start:] + part.vertices[:seampart.end + 1]
+
+            first_x, first_y = vertices[0]
+            qp_path.moveTo(first_x, first_y)
+            for vertex in vertices:
+                qp_path.lineTo(vertex[0], vertex[1])
+
+        return qp_path
+
+    def show_hull(self) -> None:
+        polys = []
+        pattern_piece_area = 0
+        for piece in self.placed_pieces:
+            poly = Polygon(piece.vertices)
+            pattern_piece_area = pattern_piece_area + poly.area
+            polys.append(poly)
+        union = GeometryCollection(polys)
+        hull = union.convex_hull
+        efficiency = pattern_piece_area / hull.area
+        fabric_length = hull.bounds[2]
+        print("Convex hull area:", hull.area)
+        print("Sum of piece areas:", pattern_piece_area)
+        print("Efficiency:", efficiency)
+        print("+++ Length of fabric required:", fabric_length)
+
+        self.shapes["hull"] = list(hull.exterior.coords)
+        self.draw_everything()
+
+
+    def export_layout(self) -> None:
+        export_full_pattern(Pattern(self.placed_pieces, final_seams), "cutting_layout.svg")
+
+    def update_fabric(self, fabric_vertices, stripe_spacing, stripe_enabled):
+        print("Fabric vertices:", fabric_vertices)
+        print("Stripe spacing:", stripe_spacing)
+        print("Stripe enabled:", stripe_enabled)
+        self.pieces = deepcopy(self.pieces_backup_copy)
+        self.fabric_vertices = fabric_vertices
+        self.stripe_spacing = stripe_spacing
+        self.stripes_enabled = stripe_enabled
+        self.placed_pieces = []
+        self.shapes = {
+            "fabric": fabric_vertices
+        }
+        self.points_of_interest = []
+
+        self.fabric_texture = generate_line_texture(fabric_vertices, stripe_spacing) if stripe_enabled else None
+        self.target_lines = []
+        self.offset = 0
+        self.draw_everything()
+
 
 if __name__ == '__main__':
     if not os.path.exists(SVG_FILE):
@@ -361,25 +617,39 @@ if __name__ == '__main__':
     height = svg_attributes.get("height")
     unit_scale = 0.1 if "mm" in height else 1
 
-    paths = load_selected_paths(SVG_FILE)
+    paths, sleeve_piece_modifiers = load_selected_paths(SVG_FILE)
+    print(sleeve_piece_modifiers)
 
     pieces = []
     for index, path_tuple in enumerate(paths):
         name, path = path_tuple
         piece = Piece(index, name, path, unit_scale)
+        if name in sleeve_piece_modifiers:
+            piece.translation = sleeve_piece_modifiers[name]["translation"]
+            piece.rotation = sleeve_piece_modifiers[name]["rotation"]
         pieces.append(piece)
 
-    seams = parse_svg_metadata(SVG_FILE)
-    for seam in seams:
-        print(f"Seam ID: {seam.id}")
-        for part in seam.seamparts:
-            print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}")
+    # for p in pieces:
+    #     print(p)
 
-    merged_pieces = reindex(merge_pieces_with_common_vertices(pieces, unit_scale)) if MERGE_PIECES else pieces
+    seams_raw = parse_svg_metadata(SVG_FILE)
+    seams = correct_vertex_indices(seams_raw, pieces)
+    # for seam in seams:
+    #     print(f"Seam ID: {seam.id}")
+    #     for part in seam.seamparts:
+    #         print(f"  Part: {part.part}, Start: {part.start}, End: {part.end}")
+
+    if MERGE_PIECES:
+        unindexed_merged_pieces, index_mappings, merged_names = merge_pieces_with_common_vertices(pieces, unit_scale)
+        merged_pieces = reindex(unindexed_merged_pieces)
+        reduced_seams = reduce_seams(merged_pieces, seams)
+        final_seams = remap_seams(reduced_seams, index_mappings, merged_names)
+    else:
+        merged_pieces = pieces
+        final_seams = seams
+
     merged_pieces.sort(key=lambda p: p.area(), reverse=True)
-    reduced_seams = reduce_seams(merged_pieces, seams) if MERGE_PIECES else seams
-
-    full_pattern = Pattern(merged_pieces, reduced_seams)
+    full_pattern = Pattern(merged_pieces, final_seams)
 
     app = QApplication(sys.argv)
     viewer = PolygonViewer(merged_pieces)

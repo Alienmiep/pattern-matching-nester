@@ -22,6 +22,7 @@ class Seampart:
 class Seam:
     id: int
     seamparts: list
+    matchable: bool = False
 
 # helpers for merging
 
@@ -93,22 +94,98 @@ def combine_paths(path1: Path, path2: Path) -> Path:
     return Path(*reordered)
 
 
-def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> list:
+def merge_pieces_with_common_vertices(pieces: list, unit_scale: float) -> tuple:
     merged_pieces = []
+    index_mappings = {}   # {old_piece_name: {old_index: new_index}}
+    merged_names = {}     # {old_piece_name: new_piece_name}
+
     while pieces:
-        # print([str(x) for x in merged_pieces])
         piece = pieces.pop(0)
         match_found = False
         for p in pieces:
-            merged_vertex_set = set(piece.vertices + p.vertices)
-            if len(merged_vertex_set) <= len(piece.vertices) + len(p.vertices) - 2:  # share at least 2 vertices
+            merged_vertex_list = list(dict.fromkeys(piece.vertices + p.vertices))
+            # preserve order, remove duplicates
+
+            if len(merged_vertex_list) <= len(piece.vertices) + len(p.vertices) - 2:
                 match_found = True
-                pieces.remove(p)  # <- allows for only one match, so only 2 pieces can be merged together
+                pieces.remove(p)
+
                 new_path = combine_paths(piece.path, p.path)
-                merged_pieces.append(Piece(-1,f"{piece.name}+{p.name}", new_path, unit_scale))
+                new_name = f"{piece.name}+{p.name}"
+                new_piece = Piece(-1, new_name, new_path, unit_scale, _original_pieces=[piece, p])
+
+                # Build index mappings
+                mapping_piece = {i: new_piece.vertices.index(v) for i, v in enumerate(piece.vertices)}
+                mapping_p     = {i: new_piece.vertices.index(v) for i, v in enumerate(p.vertices)}
+
+                index_mappings[piece.name] = mapping_piece
+                index_mappings[p.name] = mapping_p
+                merged_names[piece.name] = new_name
+                merged_names[p.name] = new_name
+
+                merged_pieces.append(new_piece)
+
         if not match_found:
             merged_pieces.append(piece)
-    return merged_pieces
+
+    return merged_pieces, index_mappings, merged_names
+
+
+def remap_seams(seams: list, index_mappings: dict, merged_names: dict) -> list:
+    updated_seams = []
+
+    for seam in seams:
+        new_seamparts = []
+        for sp in seam.seamparts:
+            if sp.part in index_mappings:
+                mapping = index_mappings[sp.part]
+                new_start = mapping.get(sp.start, sp.start)
+                new_end   = mapping.get(sp.end, sp.end)
+                new_part_name = merged_names.get(sp.part, sp.part)
+                new_seamparts.append(
+                    Seampart(new_part_name, new_start, new_end)
+                )
+            else:
+                new_seamparts.append(sp)
+        updated_seams.append(Seam(seam.id, new_seamparts, seam.matchable))
+    return updated_seams
+
+
+def correct_vertex_indices(seams: list, pieces: list) -> list:
+    """
+    Rewrite seam vertex indices so they point into the polygon vertices
+    (Piece.vertices) instead of original SVG indices.
+    """
+    # Build quick lookup by piece name
+    piece_lookup = {p.name: p for p in pieces}
+    corrected_seams = []
+
+    for seam in seams:
+        new_seamparts = []
+        for sp in seam.seamparts:
+            if sp.part not in piece_lookup:
+                # seam references a missing piece -> leave unchanged
+                new_seamparts.append(sp)
+                continue
+
+            piece = piece_lookup[sp.part]
+
+            # Map original indices to polygon indices
+            start_new = piece.vertex_mapping.get(sp.start, sp.start)
+            end_new   = piece.vertex_mapping.get(sp.end, sp.end)
+
+            new_sp = Seampart(
+                part=sp.part,
+                start=start_new,
+                end=end_new
+            )
+            new_seamparts.append(new_sp)
+
+        corrected_seams.append(
+            Seam(seam.id, new_seamparts, seam.matchable)
+        )
+
+    return corrected_seams
 
 
 def reduce_seams(merged_pieces: list, seams: list) -> list:
@@ -157,7 +234,7 @@ def get_svg_attributes(svg_file: str) -> dict:
     }
 
 
-def load_selected_paths(svg_file: str) -> list:
+def load_selected_paths(svg_file: str) -> tuple:
     tree = ETree.parse(svg_file)
     root = tree.getroot()
     selected_paths = []
@@ -185,78 +262,57 @@ def load_selected_paths(svg_file: str) -> list:
             current_elem = current_elem.getparent()
 
         # sort out sleeves to merge them (if needed)
+        sleeve_piece_modifiers = {}
+        name_attr = elem.attrib.get('name')
         if MERGE_SLEEVES:
-            name_attr = elem.attrib.get('name')
             if name_attr and 'sleeve' in name_attr.lower():
                 sleeve_paths.append((name_attr.lower(), path_data))
                 continue
         selected_paths.append((name_attr.lower(), path))
 
     if sleeve_paths:
-        sleeve_paths = prepare_sleeve_paths_for_merge(sleeve_paths)
+        sleeve_paths, sleeve_piece_modifiers = prepare_sleeve_paths_for_merge(sleeve_paths)
 
     selected_paths.extend(sleeve_paths)
-    return selected_paths
+    return selected_paths, sleeve_piece_modifiers
 
 
 
-def prepare_sleeve_paths_for_merge(path_tuples: list) -> list:
+def prepare_sleeve_paths_for_merge(path_tuples: list) -> tuple:
     if len(path_tuples) not in (2, 4):
         raise ValueError(f"Expected 2 or 4 sleeve paths, got {len(path_tuples)}")
 
-    # Get min and max x for each path
-    path_names = [x[0] for x in path_tuples]
-    path_strs = [x[1] for x in path_tuples]
-    bounds = [(i, *get_path_extreme_x(d)) for i, d in enumerate(path_strs)]
+    left_sleeve_tuples = [x for x in path_tuples if "left" in x[0]]
+    right_sleeve_tuples = [x for x in path_tuples if "right" in x[0]]
+    all_sleeve_piece_modifiers = {}
+    merged_paths = []
 
-    # Find the outermost paths
-    min_x_idx = min(bounds, key=lambda b: b[1])[0]
-    max_x_idx = max(bounds, key=lambda b: b[2])[0]
+    if left_sleeve_tuples:
+        min_path = left_sleeve_tuples.pop(0) if left_sleeve_tuples[0][0].endswith("_f") else left_sleeve_tuples.pop(1)
+        max_path = left_sleeve_tuples.pop()
+        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path, max_path, is_left=True)
+        all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
+        merged_paths.extend([(min_path[0], aligned_min_path), (max_path[0], aligned_max_path)])
 
-    # Get their path strings
-    min_path_str = path_strs[min_x_idx]
-    max_path_str = path_strs[max_x_idx]
-    min_path_name = path_names[min_x_idx]
-    max_path_name = path_names[max_x_idx]
+    if right_sleeve_tuples:
+        min_path = right_sleeve_tuples.pop(0) if right_sleeve_tuples[0][0].endswith("_f") else right_sleeve_tuples.pop(1)
+        max_path = right_sleeve_tuples.pop()
+        aligned_min_path, aligned_max_path, sleeve_piece_modifiers = align_sleeve_halves(min_path, max_path, is_left=False, offset=20)
+        all_sleeve_piece_modifiers.update(sleeve_piece_modifiers)
+        merged_paths.extend([(min_path[0], aligned_min_path), (max_path[0], aligned_max_path)])
 
-    aligned_min_path, aligned_max_path = align_sleeve_halves(min_path_str, max_path_str)
-    merged_paths = [(min_path_name, aligned_min_path), (max_path_name, aligned_max_path)]
-
-    # If we have 4 paths, merge the remaining pair
-    if len(path_strs) == 4:
-        remaining_indices = set(range(4)) - {min_x_idx, max_x_idx}
-        i1, i2 = list(remaining_indices)
-        p1, p2 = path_strs[i1], path_strs[i2]
-        path_name_1 = path_names[i1]
-        path_name_2 = path_names[i2]
-
-        # Decide which of the two remaining has the lower min-x
-        min_x1, _ = get_path_extreme_x(p1)
-        min_x2, _ = get_path_extreme_x(p2)
-
-        if min_x1 <= min_x2:
-            aligned_min_path, aligned_max_path = align_sleeve_halves(p2, p1, 20)
-            merged_paths.extend([(path_name_2, aligned_min_path), (path_name_1, aligned_max_path)])
-        else:
-            aligned_min_path, aligned_max_path = align_sleeve_halves(p1, p2, 20)
-            merged_paths.extend([(path_name_1, aligned_min_path), (path_name_2, aligned_max_path)])
-
-    return merged_paths
+    return merged_paths, all_sleeve_piece_modifiers
 
 
-def get_path_extreme_x(path_str):
-    path = parse_path(path_str)
-    xs = [seg.start.real for seg in path] + [seg.end.real for seg in path]
-    return min(xs), max(xs)
-
-
-def align_sleeve_halves(min_path_str: str, max_path_str: str, offset: int=0) -> tuple:
-    min_path = parse_path(min_path_str)
-    max_path = parse_path(max_path_str)
-    v1, n1 = get_sleeve_edge_vertices(min_path, mode='min')
-    v2, n2 = get_sleeve_edge_vertices(max_path, mode='max')
-    min_path_rotated = rotate_path_to_horizontal(min_path, v1, n1)
-    max_path_rotated = rotate_path_to_horizontal(max_path, v2, n2)
+def align_sleeve_halves(min_path_tuple: tuple, max_path_tuple: tuple, is_left: bool, offset: int=0) -> tuple:
+    sleeve_piece_modifiers = {}
+    min_path = parse_path(min_path_tuple[1])
+    max_path = parse_path(max_path_tuple[1])
+    max_path = Path(*[seg.scaled(-1, 1) for seg in max_path])
+    v1, n1 = get_sleeve_edge_vertices(min_path, is_left, is_min=True)
+    v2, n2 = get_sleeve_edge_vertices(max_path, is_left, is_min=False)
+    min_path_rotated, min_angle = rotate_path_to_horizontal(min_path, v1, n1)
+    max_path_rotated, max_angle = rotate_path_to_horizontal(max_path, v2, n2)
 
     midpoint = (v1 + v2) / 2 + offset
     min_offset = midpoint - v1
@@ -264,14 +320,23 @@ def align_sleeve_halves(min_path_str: str, max_path_str: str, offset: int=0) -> 
     aligned_min_path = min_path_rotated.translated(min_offset)
     aligned_max_path = max_path_rotated.translated(max_offset)
 
-    return aligned_min_path, aligned_max_path
+    sleeve_piece_modifiers[min_path_tuple[0]] = {"translation": (min_offset.real, min_offset.imag), "rotation": round(min_angle, 2)}
+    sleeve_piece_modifiers[max_path_tuple[0]] = {"translation": (max_offset.real, max_offset.imag), "rotation": round(max_angle, 2)}
+
+    # save_debug_svg(
+    #     [aligned_min_path, aligned_max_path],
+    #     filename=f"alignment_test_{is_left}.svg",
+    #     colors=["red", "blue"]
+    # )
+
+    return aligned_min_path, aligned_max_path, sleeve_piece_modifiers
 
 
-def get_sleeve_edge_vertices(path, mode='min'):
+def get_sleeve_edge_vertices(path: Path, is_left: bool, is_min: bool) -> tuple:
     """
-    Given a Path object and mode ('min' or 'max'), returns the target edge as (vertex, neighbor),
+    Given a Path object, returns the target edge as (vertex, neighbor),
     where:
-        - vertex is the extreme-x point (min or max)
+        - vertex is the extreme-x point (min or max depends on whether it's the left sleeve)
         - neighbor is the adjacent point with the lowest y
     The "target edge" in this context is essentially the fold line of the sleeve, the one where GarmentCode makes a cut
     """
@@ -281,12 +346,16 @@ def get_sleeve_edge_vertices(path, mode='min'):
         points.append(seg.start)
 
     # Find index of extreme x point
-    if mode == 'min':
-        index = min(range(len(points)), key=lambda i: points[i].real)
-    elif mode == 'max':
-        index = max(range(len(points)), key=lambda i: points[i].real)
+    if is_left:
+        if is_min:
+            index = max(range(len(points)), key=lambda i: points[i].real)
+        else:
+            index = min(range(len(points)), key=lambda i: points[i].real)
     else:
-        raise ValueError("mode must be 'min' or 'max'")
+        if is_min:
+            index = min(range(len(points)), key=lambda i: points[i].real)
+        else:
+            index = max(range(len(points)), key=lambda i: points[i].real)
 
     current = points[index]
     prev = points[index - 1 if index > 0 else -1]
@@ -298,7 +367,7 @@ def get_sleeve_edge_vertices(path, mode='min'):
     return current, neighbor
 
 
-def rotate_path_to_horizontal(path: Path, edge_start, edge_end):
+def rotate_path_to_horizontal(path: Path, edge_start, edge_end) -> tuple:
     dx = edge_end.real - edge_start.real
     dy = edge_end.imag - edge_start.imag
 
@@ -319,7 +388,7 @@ def rotate_path_to_horizontal(path: Path, edge_start, edge_end):
     #     colors=["red", "blue"]
     # )
 
-    return restored
+    return restored, angle
 
 
 def apply_svg_transform(path: Path, transform_str: str) -> Path:
@@ -376,8 +445,8 @@ def parse_svg_metadata(svg_path: str) -> list:
 
         for part_elem in seam_elem.findall(f'{ns}seampart'):
             part = part_elem.find(f'{ns}part').text
-            start = parse_coord(part_elem.find(f'{ns}start').text)
-            end = parse_coord(part_elem.find(f'{ns}end').text)
+            start = int(part_elem.find(f'{ns}start').text)
+            end = int(part_elem.find(f'{ns}end').text)
             # direction = part_elem.find(f'{ns}direction').text.lower() == 'true'  # :/
             seamparts.append(Seampart(part, start, end))
 
